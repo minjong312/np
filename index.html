@@ -673,6 +673,15 @@ function blockOut(p, r = 0.04, h = 0.04) {
   }
   return p;
 }
+// 커서가 가리키는 실제 표면 위치 (손 높이 고정 없음): 표면에서 카메라 쪽으로 살짝 띄움
+function surfacePoint(lift = 0.04, minY = TOP + 0.01) {
+  const h = pick();
+  if (!h) return onPlane(TOP + 0.1);
+  const p = h.point.clone().add(camera.position.clone().sub(h.point).normalize().multiplyScalar(lift));
+  p.y = Math.max(minY, p.y);
+  p.x = Math.max(-0.9, Math.min(2.8, p.x)); p.z = Math.max(-0.62, Math.min(0.3, p.z));
+  return p;
+}
 function pfBasketTarget() { return blockOut(onPlane(GROUP.y) || new V3(), 0.06, 0.03); } // 머신 앞면 z = GROUP.z
 
 function downWithPF(hit, tag) {
@@ -1046,10 +1055,10 @@ function update(dt, now) {
     const b = pfBasketTarget();
     rTarget.copy(b).add(new V3(0.01, -0.01, 0.2)); grip = true;
   } else if (right?.type === 'cup') {
-    const p = blockOut(onPlane(TOP + 0.05), 0.05, 0.13);
+    const p = blockOut(surfacePoint(0.05, TOP + 0.005), 0.05, 0.13);
     if (p) rTarget.copy(p).add(new V3(0.06, 0.07, 0.03)); grip = true;
   } else {
-    const p = onPlane(TOP + 0.1); if (p) rTarget.copy(p).add(new V3(0, 0, 0.06));
+    const p = surfacePoint(0.03, TOP + 0.03); if (p) rTarget.copy(p).add(new V3(0, 0.02, 0.09));
   }
   if (!tamp) tamperG.position.lerp(TAMPER_HOME, Math.min(1, dt * 12));
   if (right?.type !== 'brush') brushG.position.lerp(BRUSH_HOME, Math.min(1, dt * 12));
@@ -1130,7 +1139,7 @@ function update(dt, now) {
       glass.where = 'tray'; right = null; shotStream.visible = false; SFX.ding(); pop('샷 OK', c.pos.clone().add(new V3(0, 0.22, 0)));
     }
   } else {
-    if (glass.where === 'right') { const p = blockOut(onPlane(TOP + 0.1), 0.04, GLASS_H); if (p) glass.pos.copy(p); }
+    if (glass.where === 'right') { const p = blockOut(surfacePoint(0.05, TOP + 0.03), 0.04, GLASS_H); if (p) glass.pos.copy(p); }
     else glass.pos.lerp(SPOT.group, Math.min(1, dt * 15));
     glass.g.rotation.z *= 0.7;
   }
@@ -1140,7 +1149,7 @@ function update(dt, now) {
 
   // --- 컵 ---
   for (const c of cups) {
-    if (c.where === 'right') { const p = blockOut(onPlane(TOP + 0.05), 0.05, 0.13); if (p) c.pos.copy(p); }
+    if (c.where === 'right') { const p = blockOut(surfacePoint(0.05, TOP + 0.005), 0.05, 0.13); if (p) c.pos.copy(p); }
     else if (c.where === 'left') {
       c.pos.copy(LEFT_CUP);
       c.g.rotation.z += ((scoop.near ? -0.45 : 0) - c.g.rotation.z) * Math.min(1, dt * 10); // 스쿱 쪽으로 기울임
