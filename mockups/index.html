@@ -26,9 +26,8 @@
 </head>
 <body>
 <div id="ui">
-  <button data-t="A">A 파스텔</button>
-  <button data-t="B">B 우드 카페</button>
-  <button data-t="C">C 모노 레드</button>
+  <button data-t="A">A 외곽선 (플래시)</button>
+  <button data-t="B">B 외곽선 없음 (사진 느낌)</button>
   <span id="desc"></span>
 </div>
 <div id="timer">00.00</div>
@@ -37,154 +36,215 @@
 import * as THREE from 'three';
 
 const THEMES = {
-  A: { desc: '파스텔 + 검은 외곽선 (플래시 만화 느낌)', outline: true, bg: '#ffe9ef',
-    wall: '#ffd3dc', floor: '#f3e2c0', tile: '#e9d2a8', cab: '#8fd3c0', top: '#fffaf0', machine: '#ff8fa3',
-    machine2: '#ffffff', metal: '#cfd8dc', accent: '#6cc4e8', grinder: '#ffcf5a', skin: '#ffd2b0', sleeve: '#ffffff', light: '#fff4e8' },
-  B: { desc: '따뜻한 나무 + 스테인리스, 외곽선 없음 (아늑한 카페)', outline: false, bg: '#3b2a20',
-    wall: '#e8d8bd', floor: '#7a4f33', tile: '#6b432b', cab: '#6a4630', top: '#d6b47f', machine: '#d4d2cc',
-    machine2: '#3a3a3a', metal: '#b8bcc0', accent: '#2f6b4f', grinder: '#2b2b2b', skin: '#f2c49b', sleeve: '#2f6b4f', light: '#ffd9a0' },
-  C: { desc: '흰 주방 + 빨간 머신 포인트, 외곽선 (깔끔·강한 대비)', outline: true, bg: '#d9dde0',
-    wall: '#f4f4f2', floor: '#4a4a50', tile: '#3c3c42', cab: '#2e2e34', top: '#ececec', machine: '#e23d3d',
-    machine2: '#222222', metal: '#c9cdd1', accent: '#ffcc33', grinder: '#e23d3d', skin: '#f5c9a6', sleeve: '#ffffff', light: '#ffffff' },
+  A: { desc: '사진 색감 + 검은 외곽선', outline: true },
+  B: { desc: '사진 색감, 외곽선 없음', outline: false },
+};
+const C = {
+  steel: '#c4c8cc', steelDark: '#8d9298', black: '#1f2124', blackSoft: '#2c2f33', wall: '#f6f5f1', grout: '#d9d7d0',
+  led: '#ffd27a', wood: '#7a4a2a', ice: '#eef8fc', glass: '#dfeff5', bean: '#4a2a17', skin: '#f5c9a6', sleeve: '#ffffff',
+  floor: '#3a3633',
 };
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.toneMapping = THREE.NoToneMapping;
 renderer.setPixelRatio(Math.min(2, devicePixelRatio));
 renderer.shadowMap.enabled = true;
 document.body.appendChild(renderer.domElement);
-const camera = new THREE.PerspectiveCamera(50, 1, 0.05, 50);
-camera.position.set(0.4, 1.72, 1.45);
-camera.lookAt(0.5, 0.92, -0.4);
+const camera = new THREE.PerspectiveCamera(52, 1, 0.05, 50);
+camera.position.set(0.8, 1.78, 1.7);
+camera.lookAt(0.8, 1.08, -0.5);
 
 let scene, hand, T;
-const mat = c => new THREE.MeshStandardMaterial({ color: c, flatShading: true, roughness: 0.75 });
+const mats = {};
+const mat = (c, o = {}) => {
+  const k = c + JSON.stringify(o);
+  return mats[k] || (mats[k] = new THREE.MeshStandardMaterial({ color: c, flatShading: true, roughness: 0.6, ...o }));
+};
 const lineMat = new THREE.LineBasicMaterial({ color: '#111' });
 
 function add(parent, geo, color, x, y, z, opt = {}) {
-  const m = new THREE.Mesh(geo, mat(color));
+  const m = new THREE.Mesh(geo, opt.mat || mat(color));
   m.position.set(x, y, z);
   if (opt.rx) m.rotation.x = opt.rx;
+  if (opt.ry) m.rotation.y = opt.ry;
   if (opt.rz) m.rotation.z = opt.rz;
-  m.castShadow = m.receiveShadow = true;
+  m.castShadow = !opt.noShadow; m.receiveShadow = true;
   if (T.outline && !opt.noLine) m.add(new THREE.LineSegments(new THREE.EdgesGeometry(geo, 25), lineMat));
   parent.add(m);
   return m;
 }
 const box = (p, w, h, d, c, x, y, z, o) => add(p, new THREE.BoxGeometry(w, h, d), c, x, y + h / 2, z, o);
-const cyl = (p, r1, r2, h, c, x, y, z, seg = 8, o) => add(p, new THREE.CylinderGeometry(r1, r2, h, seg), c, x, y + h / 2, z, o);
+const cyl = (p, r1, r2, h, c, x, y, z, seg = 10, o) => add(p, new THREE.CylinderGeometry(r1, r2, h, seg), c, x, y + h / 2, z, o);
 
-const TOP = 0.9; // 카운터 높이
+// 흰 서브웨이 타일 텍스처
+function tileTex() {
+  const cv = document.createElement('canvas'); cv.width = 256; cv.height = 256;
+  const g = cv.getContext('2d');
+  g.fillStyle = C.grout; g.fillRect(0, 0, 256, 256);
+  for (let r = 0; r < 8; r++) for (let c = -1; c < 4; c++) {
+    g.fillStyle = C.wall;
+    g.fillRect(c * 64 + (r % 2) * 32 + 2, r * 32 + 2, 60, 28);
+  }
+  const t = new THREE.CanvasTexture(cv);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(10, 5); t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+const wallTex = tileTex();
+
+const TOP = 0.9;
+// 배치 (왼→오, 모두 붙어 있음)
+const X = { grinder: -0.62, machine: 0, water: 0.6, cups: 0.9, ice: 1.36, sink: 2.35 };
 
 function build(key) {
   T = THEMES[key];
   document.getElementById('desc').textContent = T.desc;
   document.querySelectorAll('#ui button').forEach(b => b.classList.toggle('on', b.dataset.t === key));
   scene = new THREE.Scene();
-  scene.background = new THREE.Color(T.bg);
+  scene.background = new THREE.Color('#2a2724');
 
-  scene.add(new THREE.HemisphereLight('#ffffff', T.bg, 1.8));
-  const sun = new THREE.DirectionalLight(T.light, 2.2);
-  sun.position.set(-1.5, 3, 2); sun.castShadow = true;
-  sun.shadow.mapSize.set(1024, 1024);
+  scene.add(new THREE.HemisphereLight('#ffffff', '#5a5048', 1.6));
+  const sun = new THREE.DirectionalLight('#fff6e6', 2.0);
+  sun.position.set(-1, 3, 2.5); sun.castShadow = true;
+  sun.shadow.mapSize.set(2048, 2048);
   Object.assign(sun.shadow.camera, { left: -3, right: 3, top: 3, bottom: -3 });
   scene.add(sun);
+  const ledLight = new THREE.PointLight(C.led, 0.5, 2); ledLight.position.set(0.8, 1.7, -0.45); scene.add(ledLight);
 
   // 방
-  box(scene, 6, 0.02, 4, T.floor, 0.6, -0.02, 0, { noLine: true });
-  for (let i = -5; i < 7; i++) for (let j = -3; j < 3; j++)
-    if ((i + j) % 2 === 0) box(scene, 0.5, 0.005, 0.5, T.tile, 0.6 + i * 0.5, 0, j * 0.5 + 0.25, { noLine: true });
-  box(scene, 6, 3, 0.1, T.wall, 0.6, 0, -0.75, { noLine: true });
-  box(scene, 0.1, 3, 4, T.wall, 2.6, 0, 0, { noLine: true });
-  box(scene, 6, 0.06, 0.04, T.accent, 0.6, 1.25, -0.69);
-  // 선반 + 원두 병
-  box(scene, 1.4, 0.04, 0.22, T.cab, -0.3, 1.75, -0.6);
-  for (let i = 0; i < 4; i++) cyl(scene, 0.06, 0.06, 0.18, i % 2 ? T.accent : T.grinder, -0.85 + i * 0.35, 1.79, -0.6);
+  box(scene, 7, 0.02, 4, C.floor, 0.8, -0.02, 0, { noLine: true });
+  add(scene, new THREE.PlaneGeometry(7, 3), '', 0.8, 1.5, -0.75, { mat: new THREE.MeshStandardMaterial({ map: wallTex, roughness: 0.4 }), noLine: true, noShadow: true });
+  add(scene, new THREE.PlaneGeometry(4, 3), '', 3.0, 1.5, 0, { ry: -Math.PI / 2, mat: new THREE.MeshStandardMaterial({ map: wallTex, roughness: 0.4 }), noLine: true, noShadow: true });
+  // 메뉴판 선반 + LED 띠
+  box(scene, 4.6, 0.1, 0.35, C.blackSoft, 0.9, 1.78, -0.58);
+  box(scene, 4.6, 0.012, 0.03, C.led, 0.9, 1.768, -0.44, { mat: new THREE.MeshBasicMaterial({ color: C.led }), noLine: true });
+  const boards = ['#f7e4dc', '#fbd3d8', '#f5e8d8', '#f7e4dc', '#ffd23f'];
+  boards.forEach((c, i) => box(scene, 0.8, 0.5, 0.03, c, -0.9 + i * 0.88, 1.9, -0.42, { mat: new THREE.MeshBasicMaterial({ color: c }) }));
 
-  // 카운터 (왼쪽 → 오른쪽 + 오른쪽 끝 싱크대)
-  box(scene, 3.2, TOP - 0.05, 0.75, T.cab, 0.4, 0, -0.32);
-  box(scene, 3.26, 0.05, 0.8, T.top, 0.4, TOP - 0.05, -0.32);
+  // 카운터: 스테인리스 상판 + 냉장고
+  box(scene, 3.9, 0.04, 0.8, C.steel, 0.95, TOP - 0.04, -0.33, { mat: mat(C.steel, { metalness: 0.3, roughness: 0.35 }) });
+  box(scene, 3.9, TOP - 0.1, 0.72, C.steelDark, 0.95, 0.06, -0.35);
+  for (let i = 0; i < 4; i++) {
+    const dx = -0.55 + i * 0.95;
+    box(scene, 0.8, 0.6, 0.02, C.steel, dx, 0.14, 0.02);
+    box(scene, 0.32, 0.05, 0.02, C.blackSoft, dx, 0.6, 0.04);
+  }
+  box(scene, 3.9, 0.06, 0.7, C.black, 0.95, 0, -0.35, { noLine: true });
 
-  // 분쇄기 (가장 왼쪽)
-  const gx = -0.55;
-  box(scene, 0.24, 0.32, 0.28, T.grinder, gx, TOP, -0.45);
-  box(scene, 0.18, 0.05, 0.12, T.machine2, gx, TOP + 0.08, -0.25);
-  cyl(scene, 0.09, 0.05, 0.22, '#ffffff', gx, TOP + 0.32, -0.45, 8);
-  cyl(scene, 0.06, 0.09, 0.08, '#6b3d22', gx, TOP + 0.4, -0.45, 8, { noLine: true });
-  // 넉박스 (분쇄기 앞)
-  cyl(scene, 0.07, 0.07, 0.1, T.machine2, gx - 0.02, TOP, -0.05, 8);
+  // ── 분쇄기 (넉 드로어 위) ──
+  const gx = X.grinder;
+  box(scene, 0.34, 0.11, 0.36, C.steel, gx, TOP, -0.4);
+  box(scene, 0.3, 0.07, 0.02, C.steelDark, gx, TOP + 0.02, -0.21);
+  box(scene, 0.12, 0.015, 0.02, C.steel, gx, TOP + 0.05, -0.195);
+  box(scene, 0.22, 0.32, 0.26, C.black, gx, TOP + 0.11, -0.42);
+  box(scene, 0.16, 0.06, 0.2, C.black, gx, TOP + 0.21, -0.32);  // 포터필터 거치 포크
+  box(scene, 0.2, 0.18, 0.24, C.blackSoft, gx, TOP + 0.43, -0.42);
+  box(scene, 0.11, 0.06, 0.01, '#3a4a5c', gx, TOP + 0.51, -0.295);
+  box(scene, 0.06, 0.01, 0.005, '#5fb0ff', gx, TOP + 0.48, -0.29, { noLine: true });
+  cyl(scene, 0.05, 0.05, 0.05, C.steel, gx, TOP + 0.61, -0.42, 12);
+  cyl(scene, 0.11, 0.05, 0.24, C.glass, gx, TOP + 0.66, -0.42, 12, { mat: new THREE.MeshStandardMaterial({ color: C.glass, transparent: true, opacity: 0.35, flatShading: true }) });
+  cyl(scene, 0.07, 0.045, 0.08, C.bean, gx, TOP + 0.67, -0.42, 12, { noLine: true });
+  cyl(scene, 0.115, 0.115, 0.02, C.black, gx, TOP + 0.9, -0.42, 12);
 
-  // 에스프레소 머신 (정면)
-  const mx = 0.0;
-  box(scene, 0.62, 0.42, 0.45, T.machine, mx, TOP, -0.42);
-  box(scene, 0.64, 0.05, 0.47, T.machine2, mx, TOP + 0.42, -0.42);
-  box(scene, 0.5, 0.08, 0.02, T.machine2, mx, TOP + 0.3, -0.19);
-  for (let i = -1; i <= 1; i += 2) cyl(scene, 0.035, 0.035, 0.015, '#ffffff', mx + i * 0.12, TOP + 0.32, -0.18, 10, { rx: Math.PI / 2 });
-  box(scene, 0.06, 0.04, 0.03, T.accent, mx + 0.22, TOP + 0.31, -0.17); // 추출 버튼
-  cyl(scene, 0.05, 0.05, 0.05, T.metal, mx, TOP + 0.2, -0.2, 10);
-  // 포터필터 (결합 상태)
-  cyl(scene, 0.055, 0.045, 0.04, T.metal, mx, TOP + 0.16, -0.2, 10);
-  box(scene, 0.03, 0.03, 0.18, T.machine2, mx, TOP + 0.165, -0.06);
-  box(scene, 0.4, 0.02, 0.2, T.metal, mx, TOP, -0.27); // 드립 트레이
-  // 스팀 완드
-  box(scene, 0.015, 0.2, 0.015, T.metal, mx - 0.25, TOP + 0.05, -0.17);
+  // 탬핑 매트 + 탬퍼 + 붓 (분쇄기 앞)
+  box(scene, 0.22, 0.015, 0.13, C.black, gx + 0.06, TOP, -0.08);
+  cyl(scene, 0.03, 0.03, 0.015, C.steel, gx + 0.02, TOP + 0.015, -0.08, 12);
+  cyl(scene, 0.012, 0.016, 0.05, C.wood, gx + 0.02, TOP + 0.03, -0.08, 8);
+  cyl(scene, 0.022, 0.022, 0.03, C.wood, gx + 0.02, TOP + 0.075, -0.08, 8);
+  box(scene, 0.025, 0.012, 0.12, C.wood, gx + 0.12, TOP + 0.015, -0.08);
+  box(scene, 0.03, 0.02, 0.03, '#222', gx + 0.12, TOP + 0.015, -0.155);
 
-  // 정수기
-  const wx = 0.47;
-  box(scene, 0.3, 0.5, 0.38, '#ffffff', wx, TOP, -0.45);
-  box(scene, 0.2, 0.18, 0.06, '#5b6a78', wx, TOP + 0.03, -0.25);
-  box(scene, 0.04, 0.04, 0.04, T.accent, wx, TOP + 0.21, -0.24);
-  cyl(scene, 0.1, 0.1, 0.22, '#8fd3f4', wx, TOP + 0.5, -0.45, 10);
+  // ── 에스프레소 머신 (정면, 검정 + 스테인리스, 2그룹) ──
+  const mx = X.machine;
+  for (const lx of [-0.36, 0.36]) for (const lz of [-0.58, -0.25]) cyl(scene, 0.025, 0.025, 0.06, C.steel, mx + lx, TOP, lz, 8);
+  box(scene, 0.86, 0.1, 0.42, C.black, mx, TOP + 0.06, -0.42);              // 하단 받침
+  box(scene, 0.62, 0.02, 0.2, C.steel, mx, TOP + 0.16, -0.3);                // 드립 트레이
+  box(scene, 0.86, 0.3, 0.32, C.steel, mx, TOP + 0.16, -0.47);               // 스테인리스 몸체
+  box(scene, 0.1, 0.3, 0.42, C.black, mx - 0.43, TOP + 0.16, -0.42);         // 측면 패널
+  box(scene, 0.1, 0.3, 0.42, C.black, mx + 0.43, TOP + 0.16, -0.42);
+  box(scene, 0.96, 0.13, 0.44, C.black, mx, TOP + 0.46, -0.43);             // 상단 검정 패널
+  for (const kx of [-0.3, -0.21, 0.27]) cyl(scene, 0.025, 0.025, 0.03, C.steel, mx + kx, TOP + 0.52, -0.2, 12, { rx: Math.PI / 2 });
+  for (let i = 0; i < 4; i++) {
+    cyl(scene, 0.012, 0.012, 0.015, C.steel, mx - 0.12 + i * 0.04, TOP + 0.52, -0.205, 8, { rx: Math.PI / 2 });
+    cyl(scene, 0.012, 0.012, 0.015, C.steel, mx + 0.06 + i * 0.04, TOP + 0.52, -0.205, 8, { rx: Math.PI / 2 });
+  }
+  box(scene, 0.86, 0.04, 0.4, C.steel, mx, TOP + 0.59, -0.43);              // 컵 워머
+  for (const s of [-1, 1]) {
+    const hx = mx + s * 0.17;
+    cyl(scene, 0.055, 0.05, 0.06, C.steel, hx, TOP + 0.38, -0.31, 12);       // 그룹헤드
+    cyl(scene, 0.05, 0.045, 0.035, C.steel, hx, TOP + 0.34, -0.31, 12);      // 포터필터 바스켓
+    box(scene, 0.03, 0.03, 0.17, C.black, hx, TOP + 0.345, -0.2);            // 손잡이
+    cyl(scene, 0.006, 0.006, 0.22, C.steel, mx + s * 0.38, TOP + 0.16, -0.22, 6, { rz: s * 0.15 }); // 스팀 완드
+  }
+  box(scene, 0.06, 0.06, 0.01, C.blackSoft, mx - 0.12, TOP + 0.22, -0.305);
+  cyl(scene, 0.035, 0.035, 0.01, '#f2f2f2', mx + 0.13, TOP + 0.25, -0.305, 12, { rx: Math.PI / 2 });
+  // 머신 위: 뚜껑 + 컵 홀더 더미
+  for (let i = 0; i < 8; i++) cyl(scene, 0.05, 0.05, 0.012, '#ffffff', mx - 0.22, TOP + 0.63 + i * 0.012, -0.42, 14);
+  for (let i = 0; i < 8; i++) cyl(scene, 0.052, 0.045, 0.014, '#b07a4a', mx + 0.0, TOP + 0.63 + i * 0.014, -0.42, 14);
+  for (let i = 0; i < 6; i++) cyl(scene, 0.05, 0.05, 0.012, '#ffffff', mx + 0.22, TOP + 0.63 + i * 0.012, -0.42, 14);
 
-  // 제빙기
-  const ix = 0.86;
-  box(scene, 0.46, 0.55, 0.45, T.metal, ix, TOP, -0.42);
-  box(scene, 0.28, 0.2, 0.06, '#5b6a78', ix, TOP + 0.03, -0.19);
-  box(scene, 0.06, 0.04, 0.04, '#9fe8ff', ix, TOP + 0.24, -0.17);
-  box(scene, 0.3, 0.06, 0.01, '#ffffff', ix, TOP + 0.4, -0.19);
+  // ── 정수기 (스테인리스 + 검정 전면) ──
+  const wx = X.water;
+  box(scene, 0.22, 0.62, 0.4, C.steel, wx, TOP, -0.45);
+  box(scene, 0.16, 0.5, 0.01, C.black, wx, TOP + 0.08, -0.245);
+  box(scene, 0.07, 0.025, 0.012, '#e05050', wx, TOP + 0.5, -0.238, { noLine: true });
+  cyl(scene, 0.02, 0.02, 0.04, C.steel, wx, TOP + 0.33, -0.22, 8, { rx: Math.PI / 2 });
+  cyl(scene, 0.01, 0.01, 0.04, C.steel, wx, TOP + 0.29, -0.21, 6);
+  box(scene, 0.16, 0.015, 0.12, C.steelDark, wx, TOP, -0.2);
 
-  // 싱크대 (가장 오른쪽)
-  const sx = 1.6;
-  box(scene, 0.7, 0.06, 0.55, T.metal, sx, TOP - 0.04, -0.33);
-  box(scene, 0.56, 0.02, 0.42, '#5b6a78', sx, TOP + 0.005, -0.33, { noLine: true });
-  cyl(scene, 0.02, 0.02, 0.32, T.metal, sx, TOP, -0.58, 6);
-  box(scene, 0.03, 0.03, 0.18, T.metal, sx, TOP + 0.3, -0.5);
+  // ── 컵 보관대 (정수기와 아이스빈 사이) ──
+  const cx = X.cups;
+  box(scene, 0.34, 0.05, 0.3, C.steel, cx, TOP, -0.38);
+  for (let r = 0; r < 2; r++) for (let c = 0; c < 3; c++) {
+    const n = 14 - r * 2 - c;
+    const tx = cx - 0.1 + c * 0.1, tz = -0.45 + r * 0.12;
+    for (let i = 0; i < n; i++) cyl(scene, 0.045, 0.035, 0.12, C.glass, tx, TOP + 0.05 + i * 0.022, tz, 12,
+      { mat: mat(C.glass, { transparent: true, opacity: 0.8 }), noLine: i < n - 1 });
+  }
 
-  // 앞쪽 소품: 컵 더미, 뚜껑, 컵 홀더, 붓, 탬퍼
-  for (let i = 0; i < 4; i++) cyl(scene, 0.045, 0.035, 0.13, '#eaf6fb', 0.25, TOP + i * 0.025, -0.05, 10);
-  for (let i = 0; i < 5; i++) cyl(scene, 0.05, 0.05, 0.012, '#ffffff', 0.42, TOP + i * 0.012, -0.03, 10);
-  for (let i = 0; i < 5; i++) cyl(scene, 0.048, 0.043, 0.012, '#b07a4a', 0.58, TOP + i * 0.012, -0.03, 10);
-  box(scene, 0.03, 0.015, 0.12, '#c27a3e', -0.3, TOP, -0.05);
-  box(scene, 0.04, 0.025, 0.03, '#333333', -0.3, TOP, -0.12);
-  cyl(scene, 0.045, 0.045, 0.02, T.metal, -0.17, TOP, -0.06, 10);
-  cyl(scene, 0.015, 0.02, 0.07, T.machine2, -0.17, TOP + 0.02, -0.06, 6);
-  // 컵 (정수기 아래)
-  const cupG = new THREE.CylinderGeometry(0.045, 0.035, 0.13, 12);
-  const cup = new THREE.Mesh(cupG, new THREE.MeshStandardMaterial({ color: '#eaf6fb', transparent: true, opacity: 0.55, flatShading: true }));
-  cup.position.set(wx, TOP + 0.065, -0.24); scene.add(cup);
-  cyl(scene, 0.04, 0.034, 0.08, '#3b2010', wx, TOP + 0.003, -0.24, 12, { noLine: true });
+  // ── 아이스빈 (카운터 매립형, 직접 퍼서 사용) ──
+  const ix = X.ice;
+  box(scene, 0.56, 0.03, 0.62, C.steel, ix, TOP - 0.01, -0.36);
+  box(scene, 0.48, 0.005, 0.52, '#9fb7c4', ix, TOP + 0.016, -0.36, { noLine: true });
+  const iceG = new THREE.BoxGeometry(0.035, 0.03, 0.035);
+  const iceM = new THREE.InstancedMesh(iceG, mat(C.ice, { transparent: true, opacity: 0.92 }), 160);
+  const d = new THREE.Object3D();
+  for (let i = 0; i < 160; i++) {
+    d.position.set(ix - 0.22 + Math.random() * 0.44, TOP + 0.02 + Math.random() * 0.012, -0.6 + Math.random() * 0.46);
+    d.rotation.set(Math.random(), Math.random(), Math.random()); d.updateMatrix(); iceM.setMatrixAt(i, d.matrix);
+  }
+  scene.add(iceM);
+  box(scene, 0.03, 0.04, 0.62, C.steel, ix - 0.27, TOP, -0.36);
+  box(scene, 0.03, 0.04, 0.62, C.steel, ix + 0.27, TOP, -0.36);
+  box(scene, 0.56, 0.04, 0.03, C.steel, ix, TOP, -0.06);
+  box(scene, 0.56, 0.04, 0.03, C.steel, ix, TOP, -0.66);
+  box(scene, 0.25, 0.012, 0.6, C.steel, ix + 0.14, TOP + 0.04, -0.36, { mat: mat(C.steel, { transparent: true, opacity: 0.85 }) }); // 반쯤 열린 덮개
+  // 스쿱
+  box(scene, 0.09, 0.05, 0.12, C.steel, ix - 0.08, TOP + 0.04, -0.28, { rx: -0.2 });
+  cyl(scene, 0.012, 0.012, 0.12, C.black, ix - 0.08, TOP + 0.07, -0.16, 6, { rx: Math.PI / 2 - 0.2 });
 
-  // 손 (마우스 따라감)
-  hand = new THREE.Group();
-  const skin = T.skin;
-  box(hand, 0.09, 0.03, 0.1, skin, 0, 0, 0);
-  for (let i = 0; i < 4; i++) box(hand, 0.018, 0.022, 0.07, skin, -0.033 + i * 0.022, 0.003, -0.08, { rx: -0.25 });
-  box(hand, 0.02, 0.022, 0.05, skin, -0.06, 0.0, -0.01, { rx: 0, rz: 0.6 });
-  box(hand, 0.07, 0.07, 0.25, T.sleeve, 0.01, -0.03, 0.17);
-  hand.scale.setScalar(0.8);
-  hand.rotation.y = 0.25;
-  scene.add(hand);
-  // 왼손 (정지)
-  const left = new THREE.Group();
-  box(left, 0.09, 0.03, 0.1, skin, 0, 0, 0);
-  for (let i = 0; i < 4; i++) box(left, 0.018, 0.022, 0.07, skin, -0.033 + i * 0.022, 0.003, -0.08, { rx: -0.25 });
-  box(left, 0.07, 0.07, 0.25, T.sleeve, -0.01, -0.03, 0.17);
-  left.scale.setScalar(0.8);
-  left.position.set(-0.25, TOP + 0.06, 0.25); left.rotation.y = -0.35;
-  scene.add(left);
+  // ── 싱크대 (가장 오른쪽) ──
+  const sx = X.sink;
+  box(scene, 0.62, 0.005, 0.5, '#6d7880', sx, TOP - 0.003, -0.36, { noLine: true });
+  for (const [w, dd, ox, oz] of [[0.66, 0.03, 0, -0.1], [0.66, 0.03, 0, -0.62], [0.03, 0.55, -0.32, -0.36], [0.03, 0.55, 0.32, -0.36]])
+    box(scene, w, 0.02, dd, C.steel, sx + ox, TOP, oz);
+  cyl(scene, 0.02, 0.025, 0.36, C.steel, sx, TOP, -0.62, 8);
+  box(scene, 0.025, 0.025, 0.2, C.steel, sx, TOP + 0.34, -0.53);
+  cyl(scene, 0.012, 0.012, 0.05, C.steel, sx, TOP + 0.3, -0.43, 6);
+
+  // 손
+  hand = makeHand(); hand.rotation.y = 0.25; scene.add(hand);
+  const left = makeHand(); left.position.set(-0.05, TOP + 0.06, 0.25); left.rotation.y = -0.35; scene.add(left);
 }
 
-// 마우스 → 카운터 위 평면에 손 배치
+function makeHand() {
+  const h = new THREE.Group();
+  box(h, 0.09, 0.03, 0.1, C.skin, 0, 0, 0);
+  for (let i = 0; i < 4; i++) box(h, 0.018, 0.022, 0.07, C.skin, -0.033 + i * 0.022, 0.003, -0.08, { rx: -0.25 });
+  box(h, 0.02, 0.022, 0.05, C.skin, -0.06, 0, -0.01, { rz: 0.6 });
+  box(h, 0.07, 0.07, 0.25, C.sleeve, 0, -0.03, 0.17);
+  h.scale.setScalar(0.8);
+  return h;
+}
+
 const ray = new THREE.Raycaster(), ndc = new THREE.Vector2(0.3, -0.3);
 const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -(TOP + 0.12));
 const tgt = new THREE.Vector3();
@@ -200,7 +260,7 @@ const t0 = performance.now();
 renderer.setAnimationLoop(now => {
   ray.setFromCamera(ndc, camera);
   if (ray.ray.intersectPlane(plane, tgt)) {
-    tgt.z = Math.max(-0.35, Math.min(0.35, tgt.z)); tgt.x = Math.max(-0.9, Math.min(1.9, tgt.x));
+    tgt.z = Math.max(-0.35, Math.min(0.35, tgt.z)); tgt.x = Math.max(-0.9, Math.min(2.6, tgt.x));
     hand.position.lerp(new THREE.Vector3(tgt.x, tgt.y + Math.sin(now / 300) * 0.005, tgt.z + 0.05), 0.25);
   }
   document.getElementById('timer').textContent = ((now - t0) / 1000 % 100).toFixed(2).padStart(5, '0');
