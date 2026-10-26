@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>[아아 장인]</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: #2b2233; color: #fff;
+    font-family: "Malgun Gothic", "Apple SD Gothic Neo", monospace;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    min-height: 100vh; user-select: none;
+  }
+  #wrap { position: relative; border: 4px solid #120d17; box-shadow: 0 0 0 4px #5b4a6b; }
+  canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; image-rendering: crisp-edges; }
+  #hud {
+    position: absolute; left: 0; top: 0; right: 0; display: flex; gap: 18px; padding: 8px 12px;
+    font-weight: bold; font-size: 20px; text-shadow: 2px 2px 0 #000; pointer-events: none;
+  }
+  #hud .t { color: #fff7a8; }
+  #hud .b { color: #9fe8ff; margin-left: auto; }
+  #hud .g { color: #ffb3c9; }
+  .ov {
+    position: absolute; inset: 0; background: rgba(20, 12, 28, 0.82);
+    display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 12px;
+  }
+  .ov.hidden { display: none; }
+  .ov h1 { margin: 0; font-size: 44px; color: #fff7a8; text-shadow: 4px 4px 0 #8e3434; letter-spacing: 2px; }
+  .ov h2 { margin: 0; font-size: 34px; color: #9fe8ff; text-shadow: 3px 3px 0 #000; }
+  .ov p { margin: 0; line-height: 1.6; font-size: 15px; color: #e8dcf0; }
+  .ov .rec { font-size: 22px; color: #fff; }
+  .ov .new { color: #ff7aa8; font-size: 24px; font-weight: bold; animation: blink 0.5s steps(2) infinite; }
+  @keyframes blink { 50% { opacity: 0.3; } }
+  button {
+    font: bold 18px "Malgun Gothic", monospace; color: #2b2233; background: #fff7a8;
+    border: 3px solid #120d17; box-shadow: 4px 4px 0 #120d17; padding: 8px 22px; cursor: pointer;
+  }
+  button:hover { background: #fff; }
+  button:active { transform: translate(3px, 3px); box-shadow: 1px 1px 0 #120d17; }
+  #serve { background: #8fe3b0; font-size: 22px; }
+  #bar { display: flex; gap: 14px; align-items: center; margin-top: 14px; }
+  #bar .tip { font-size: 13px; color: #b9a8c8; }
+  #fx { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+  .pop {
+    position: absolute; transform: translate(-50%, -50%); font-weight: bold; font-size: 18px; white-space: nowrap;
+    text-shadow: 2px 2px 0 #000, -1px -1px 0 #000; animation: up 1s ease-out forwards;
+  }
+  .pop.big { font-size: 34px; }
+  @keyframes up {
+    0% { opacity: 0; margin-top: 10px; transform: translate(-50%, -50%) scale(0.6); }
+    15% { opacity: 1; transform: translate(-50%, -50%) scale(1.15); }
+    30% { transform: translate(-50%, -50%) scale(1); }
+    100% { opacity: 0; margin-top: -40px; }
+  }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <canvas id="c" width="320" height="180"></canvas>
+  <div id="hud"><span class="t" id="time">0.00초</span><span class="g" id="goals"></span><span class="b" id="best"></span></div>
+  <div id="fx"></div>
+  <div class="ov" id="ovStart">
+    <h1>[아아 장인]</h1>
+    <p>아이스 아메리카노를 최대한 빨리 만들어라!<br>
+      컵 거치대 클릭 → 새 컵 · 컵은 드래그로 이동<br>
+      제빙기 / 정수기: 컵을 아래에 두고 <b>꾹 누르기</b> (분홍선=얼음, 파란선=물)<br>
+      에스프레소 머신: 클릭하면 샷 추출(4초) · 컵 없이 미리 걸어둬도 OK · 샷 2개<br>
+      선을 넘으면 넘쳐서 실패! 컵을 <b>위로 휙 던지면</b> 날아감 · 싱크대에 넣으면 골인</p>
+    <p class="rec" id="startBest"></p>
+    <button id="startBtn">시작!</button>
+  </div>
+  <div class="ov hidden" id="ovEnd">
+    <h2>☕ 아아 완성!</h2>
+    <p class="rec" id="endTime"></p>
+    <p class="new" id="endNew">NEW RECORD!</p>
+    <p class="rec" id="endBest"></p>
+    <button id="againBtn">다시 하기</button>
+  </div>
+</div>
+<div id="bar">
+  <button id="serve">서빙 ☕</button>
+  <button id="retry">다시 하기</button>
+  <span class="tip">컵 위 표시: [얼음][샷][샷][물] — 모두 켜지면 서빙!</span>
+</div>
+
+<script>
+// ===== 기본 설정 =====
+const W = 320, H = 180, F = 110, CX = 160, CY = 50;
+const FLOOR = -1.8, CEIL = 1.4, RW = 2.6, ZF = 6;
+const CT = -0.8, CZ0 = 1.0, CZ1 = 1.6, CUPZ = 1.3, MZ = 1.4;
+const CUP_W = 0.13, CUP_H = 0.21;
+const SINK = { hw: 0.75, z0: 5.1, rim: -0.95 };
+const ST = { rack: -1.6, ice: -0.55, esp: 0.55, water: 1.6 };
+const ICE_MIN = 0.38, ICE_LINE = 0.5, WAT_MIN = 0.78, WAT_LINE = 0.9, GRACE = 0.015;
+const SHOT_VOL = 0.07, ICE_RATE = 0.3, WATER_RATE = 0.34, BREW_TIME = 4;
+const GRAV = 9.8;
+const BEST_KEY = 'aaJangin.best';
+
+const cv = document.getElementById('c');
+const main = cv.getContext('2d');
+let g = main;
+const wrap = document.getElementById('wrap');
+const fx = document.getElementById('fx');
+let sc = 3;
+
+function P(x, y, z) { const s = F / z; return [CX + x * s, CY - y * s, s]; }
+function R(x, y, w, h, c) { g.fillStyle = c; g.fillRect(Math.round(x), Math.round(y), Math.round(w), Math.round(h)); }
+function poly(pts, c) {
+  g.fillStyle = c; g.beginPath();
+  pts.forEach((p, i) => { const [sx, sy] = P(p[0], p[1], p[2]); i ? g.lineTo(sx, sy) : g.moveTo(sx, sy); });
+  g.closePath(); g.fill();
+}
+function blob(cx, cy, rx, ry, c) {
+  rx = Math.max(1, rx); ry = Math.max(1, ry);
+  for (let dy = -Math.ceil(ry); dy <= Math.ceil(ry); dy++) {
+    const k = 1 - (dy * dy) / (ry * ry); if (k < 0) continue;
+    const hw = Math.round(rx * Math.sqrt(k));
+    R(cx - hw, cy + dy, hw * 2 + 1, 1, c);
+  }
+}
+const sxOf = x => Math.round(P(x, CT, CUPZ)[0]);
+const BY = Math.round(P(0, CT, MZ)[1]);
+
+// ===== 정적 레이어 미리 그리기 =====
+function layer(fn) { const c = document.createElement('canvas'); c.width = W; c.height = H; g = c.getContext('2d'); fn(); g = main; return c; }
+
+const roomLayer = layer(() => {
+  // 천장
+  poly([[-RW, CEIL, 1], [RW, CEIL, 1], [RW, CEIL, ZF], [-RW, CEIL, ZF]], '#f1e4cf');
+  // 좌우 벽 (위/아래 패널)
+  poly([[-RW, -0.9, 1], [-RW, CEIL, 1], [-RW, CEIL, ZF], [-RW, -0.9, ZF]], '#c6eadc');
+  poly([[-RW, FLOOR, 1], [-RW, -0.9, 1], [-RW, -0.9, ZF], [-RW, FLOOR, ZF]], '#86c4ae');
+  poly([[-RW, -0.9, 1], [-RW, -0.84, 1], [-RW, -0.84, ZF], [-RW, -0.9, ZF]], '#ffffff');
+  poly([[RW, -0.9, 1], [RW, CEIL, 1], [RW, CEIL, ZF], [RW, -0.9, ZF]], '#b8e0d1');
+  poly([[RW, FLOOR, 1], [RW, -0.9, 1], [RW, -0.9, ZF], [RW, FLOOR, ZF]], '#79b6a1');
+  poly([[RW, -0.9, 1], [RW, -0.84, 1], [RW, -0.84, ZF], [RW, -0.9, ZF]], '#f4f4f4');
+  // 벽 포스터 / 선반
+  poly([[-RW, 0.0, 2.6], [-RW, 0.8, 2.6], [-RW, 0.8, 3.6], [-RW, 0.0, 3.6]], '#ff9db5');
+  poly([[-RW, 0.15, 2.8], [-RW, 0.65, 2.8], [-RW, 0.65, 3.4], [-RW, 0.15, 3.4]], '#fff3d6');
+  poly([[-RW, 0.25, 3.0], [-RW, 0.5, 3.0], [-RW, 0.5, 3.2], [-RW, 0.25, 3.2]], '#7a4a24');
+  poly([[RW, 0.2, 2.5], [RW, 0.26, 2.5], [RW, 0.26, 4.2], [RW, 0.2, 4.2]], '#a0663f');
+  for (let i = 0; i < 4; i++) {
+    const z = 2.7 + i * 0.4;
+    poly([[RW, 0.26, z], [RW, 0.5, z], [RW, 0.5, z + 0.22], [RW, 0.26, z + 0.22]], ['#ff9db5', '#fff7a8', '#9fe8ff', '#ffffff'][i]);
+  }
+  // 바닥 체크 타일
+  const nx = 10, step = (RW * 2) / nx;
+  for (let i = 0; i < nx; i++) for (let z = 1, j = 0; z < ZF; z += 0.5, j++) {
+    const x0 = -RW + i * step;
+    poly([[x0, FLOOR, z], [x0 + step, FLOOR, z], [x0 + step, FLOOR, Math.min(ZF, z + 0.5)], [x0, FLOOR, Math.min(ZF, z + 0.5)]],
+      (i + j) % 2 ? '#e8cfa4' : '#c99a6b');
+  }
+  // 안쪽 벽
+  const [x0, y0] = P(-RW, CEIL, ZF), [x1, y1] = P(RW, FLOOR, ZF);
+  R(x0, y0, x1 - x0, y1 - y0, '#d6f0e7');
+  for (let y = Math.round(y0) + 30; y < y1; y += 3) R(x0, y, x1 - x0, 1, '#b5dccd');
+  for (let y = Math.round(y0) + 30, k = 0; y < y1; y += 3, k++)
+    for (let x = Math.round(x0) + (k % 2) * 3; x < x1; x += 6) R(x, y, 1, 3, '#b5dccd');
+  // 창문
+  R(118, 30, 24, 20, '#ffffff'); R(120, 32, 20, 16, '#9ad7ff'); R(129, 32, 2, 16, '#ffffff'); R(120, 39, 20, 2, '#ffffff');
+  R(122, 34, 5, 2, '#ffffff'); R(133, 43, 4, 2, '#e6f6ff');
+  // 메뉴판
+  R(176, 29, 26, 19, '#7a4a24'); R(178, 31, 22, 15, '#3a3f3a');
+  R(180, 33, 10, 1, '#fff'); R(180, 36, 16, 1, '#ddd'); R(180, 39, 12, 1, '#ddd'); R(180, 42, 14, 1, '#ffd25a');
+  // 조명
+  for (const lx of [-1.1, 1.1]) {
+    const [cx, cy] = P(lx, CEIL, 4), [, ly] = P(lx, 0.85, 4);
+    R(cx, cy, 1, ly - cy, '#555');
+    R(cx - 4, ly, 9, 3, '#ff9db5'); R(cx - 5, ly + 3, 11, 1, '#e07a95'); R(cx - 1, ly + 4, 3, 1, '#fff7a8');
+  }
+});
+
+const sinkLayer = layer(() => {
+  const { hw, z0, rim } = SINK;
+  poly([[-hw, FLOOR, z0], [hw, FLOOR, z0], [hw, rim, z0], [-hw, rim, z0]], '#9aa7b3');
+  const [a] = P(0, rim, z0), [, ty] = P(0, rim, z0), [, fy] = P(0, FLOOR, z0);
+  R(a - 1, ty + 2, 1, fy - ty - 3, '#7d8996');
+  R(a - 6, ty + 6, 2, 2, '#e6ecf0'); R(a + 5, ty + 6, 2, 2, '#e6ecf0');
+  poly([[-hw, rim, z0], [hw, rim, z0], [hw, rim, ZF], [-hw, rim, ZF]], '#e3eaef');
+  poly([[-hw + 0.1, rim, z0 + 0.12], [hw - 0.1, rim, z0 + 0.12], [hw - 0.1, rim, ZF - 0.12], [-hw + 0.1, rim, ZF - 0.12]], '#56636f');
+  // 수전
+  const [fx0, fy0] = P(0, rim, ZF - 0.05);
+  R(fx0 - 1, fy0 - 9, 3, 9, '#b9c3cc'); R(fx0 - 1, fy0 - 9, 6, 2, '#b9c3cc'); R(fx0 + 4, fy0 - 7, 1, 1, '#9fe8ff');
+});
+
+const counterLayer = layer(() => {
+  poly([[-3, CT, CZ0], [3, CT, CZ0], [3, CT, CZ1], [-3, CT, CZ1]], '#f4ead9');
+  const [, by1] = P(0, CT, CZ1), [, by0] = P(0, CT, CZ0);
+  R(0, by1, W, 1, '#d9c4a5');
+  for (let i = 0; i < 18; i++) R((i * 37) % W, by1 + 4 + (i * 7) % (by0 - by1 - 6), 6, 1, '#ece0cb');
+  R(0, by0, W, 3, '#e3cfae');
+  R(0, by0 + 3, W, H - by0, '#b97a4a');
+  for (let x = 0; x < W; x += 32) R(x, by0 + 3, 1, H, '#9b6239');
+  R(0, by0 + 3, W, 1, '#8a5532');
+});
+
+// ===== 기계 위치 / 판정 영역 =====
+const M = {
+  rack: { x: sxOf(ST.rack) }, ice: { x: sxOf(ST.ice) }, esp: { x: sxOf(ST.esp) }, water: { x: sxOf(ST.water) },
+};
+M.rack.box = [M.rack.x - 20, BY - 30, 40, 32];
+M.ice.box = [M.ice.x - 20, BY - 60, 40, 60];
+M.esp.box = [M.esp.x - 28, BY - 50, 56, 50];
+M.water.box = [M.water.x - 15, BY - 80, 30, 80];
+const inBox = (b, x, y) => x >= b[0] && x <= b[0] + b[2] && y >= b[1] && y <= b[1] + b[3];
+
+// ===== 게임 상태 =====
+let cups, parts, decals, esp, hold, drag, state = 'ready', t0 = 0, elapsed = 0, goals = 0, samples = [];
+let best = null;
+try { const v = parseFloat(localStorage.getItem(BEST_KEY)); if (v > 0) best = v; } catch (e) {}
+const mouse = { x: 0, y: 0, down: false };
+
+function reset() {
+  cups = []; parts = []; decals = []; esp = { brew: [], ready: 0, pourT: 0 };
+  hold = null; drag = null; elapsed = 0; goals = 0; fx.innerHTML = '';
+}
+reset();
+
+const level = c => c.water + c.shots * SHOT_VOL;
+const liqColor = c => c.shots > 0 ? (c.water > 0.08 ? '#8a5a2b' : '#3b2010') : '#a7dcf2';
+const isOk = c => !c.failed && c.ice >= ICE_MIN && c.ice <= ICE_LINE + GRACE && c.shots === 2 &&
+  level(c) >= WAT_MIN && level(c) <= WAT_LINE + GRACE;
+const cupAt = x => cups.find(c => c.state === 'counter' && Math.abs(c.x - x) < 0.06);
+
+function pop(text, x, y, color = '#fff', big = false) {
+  const d = document.createElement('div');
+  d.className = 'pop' + (big ? ' big' : '');
+  d.textContent = text; d.style.color = color;
+  d.style.left = x * sc + 'px'; d.style.top = y * sc + 'px';
+  fx.appendChild(d); setTimeout(() => d.remove(), 1000);
+}
+const popCup = (c, t, col) => { const [sx, sy, s] = P(c.x, c.y, c.z); pop(t, sx, sy - CUP_H * s - 8, col); };
+
+function overflow(c) {
+  if (c.failed) return;
+  c.failed = true; c.spill = 1.2;
+  popCup(c, '넘쳤다! 새 컵으로!', '#ff6b6b');
+}
+
+function addShot(c) {
+  c.shots++; esp.pourT = 0.5;
+  popCup(c, '샷 +1', '#e0b080');
+  if (level(c) > WAT_LINE + GRACE) overflow(c);
+}
+
+function spawnCup() {
+  let x = -1.05;
+  while (cups.some(c => c.state === 'counter' && Math.abs(c.x - x) < 0.1) && x < 2) x += 0.16;
+  cups.push({ x, y: CT, z: CUPZ, vx: 0, vy: 0, vz: 0, ice: 0, water: 0, shots: 0, failed: false, spill: 0, state: 'counter', born: 0.25 });
+}
+
+function part(x, y, z, vx, vy, vz, c, sz, life = Infinity, solid = true) {
+  parts.push({ x, y, z, vx, vy, vz, c, sz, life, solid, stuck: false });
+  if (parts.length > 900) parts.splice(parts.findIndex(p => p.stuck) >>> 0, 1);
+}
+
+function shatter(c) {
+  c.state = 'gone';
+  const [sx, sy] = P(c.x, FLOOR, c.z);
+  pop('쨍그랑!', sx, sy - 10, '#ffd25a');
+  const lv = level(c);
+  if (lv > 0.02) decals.push({ x: c.x, z: c.z, r: 0.12 + lv * 0.3, c: liqColor(c), r2: Math.random() });
+  for (let i = 0; i < 14; i++) {
+    const a = Math.random() * Math.PI * 2, sp = 0.6 + Math.random() * 1.6;
+    part(c.x, FLOOR + 0.05, c.z, Math.cos(a) * sp, 1 + Math.random() * 2, Math.sin(a) * sp * 0.8,
+      i % 3 ? '#e6f2f7' : '#a9c6d3', 0.03 + Math.random() * 0.03);
+  }
+  for (let i = 0; i < Math.round(c.ice * 14); i++) {
+    const a = Math.random() * Math.PI * 2, sp = 0.3 + Math.random() * 1.2;
+    part(c.x, FLOOR + 0.05, c.z, Math.cos(a) * sp, 0.5 + Math.random() * 1.5, Math.sin(a) * sp * 0.6, '#f4fcff', 0.045);
+  }
+  if (lv > 0.02) for (let i = 0; i < 10; i++) {
+    const a = Math.random() * Math.PI * 2, sp = 0.5 + Math.random() * 1.5;
+    part(c.x, FLOOR + 0.05, c.z, Math.cos(a) * sp, 0.5 + Math.random() * 1.8, Math.sin(a) * sp, liqColor(c), 0.025);
+  }
+}
+
+function goal(c) {
+  c.state = 'gone'; goals++;
+  const [sx, sy] = P(0, SINK.rim, SINK.z0);
+  pop('골인!', sx, sy - 14, '#fff7a8', true);
+  for (let i = 0; i < 16; i++)
+    part(c.x, SINK.rim, c.z, (Math.random() - 0.5) * 2, 1 + Math.random() * 2, (Math.random() - 0.5) * 1.5,
+      i % 2 ? '#9fe8ff' : '#ffffff', 0.03, 0.6, false);
+}
+
+// ===== 입력 =====
+function toLow(e) { const r = cv.getBoundingClientRect(); return [(e.clientX - r.left) * W / r.width, (e.clientY - r.top) * H / r.height]; }
+function cupBox(c) {
+  const [sx, sy, s] = P(c.x, c.y, c.z), w = CUP_W * s, h = CUP_H * s;
+  return [sx - w / 2 - 2, sy - h - 2, w + 4, h + 4];
+}
+function cupUnder(mx, my) {
+  for (let i = cups.length - 1; i >= 0; i--) if (cups[i].state === 'counter' && inBox(cupBox(cups[i]), mx, my)) return cups[i];
+  return null;
+}
+function machineUnder(mx, my) {
+  for (const k of ['rack', 'ice', 'esp', 'water']) if (inBox(M[k].box, mx, my)) return k;
+  return null;
+}
+
+cv.addEventListener('mousedown', e => {
+  if (state !== 'play' || e.button !== 0) return;
+  e.preventDefault();
+  const [mx, my] = toLow(e);
+  mouse.down = true; mouse.x = mx; mouse.y = my;
+  samples = [{ t: performance.now(), x: mx, y: my }];
+  const c = cupUnder(mx, my);
+  if (c) { drag = c; c.state = 'drag'; cups.splice(cups.indexOf(c), 1); cups.push(c); moveDrag(); return; }
+  const m = machineUnder(mx, my);
+  if (m === 'rack') spawnCup();
+  else if (m === 'ice' || m === 'water') hold = m;
+  else if (m === 'esp') {
+    if (esp.brew.length < 2) { esp.brew.push({ t: 0 }); pop('추출 시작!', M.esp.x, BY - 58, '#e0b080'); }
+    else pop('추출 중... (최대 2개)', M.esp.x, BY - 58, '#ffb3c9');
+  }
+});
+
+window.addEventListener('mousemove', e => {
+  const [mx, my] = toLow(e);
+  mouse.x = mx; mouse.y = my;
+  const now = performance.now();
+  samples.push({ t: now, x: mx, y: my });
+  while (samples.length && now - samples[0].t > 150) samples.shift();
+  if (drag) { cv.style.cursor = 'grabbing'; return; }
+  cv.style.cursor = state === 'play' && (cupUnder(mx, my) || machineUnder(mx, my)) ? 'pointer' : 'default';
+});
+
+window.addEventListener('mouseup', () => {
+  mouse.down = false; hold = null;
+  if (drag) release(drag);
+  drag = null;
+});
+
+function moveDrag() {
+  const c = drag;
+  c.x = Math.max(-2.3, Math.min(2.3, (mouse.x - CX) * CUPZ / F));
+  c.y = Math.max(CT, (CY - mouse.y) * CUPZ / F - CUP_H / 2);
+  c.z = CUPZ;
+}
+
+function release(c) {
+  const now = performance.now();
+  let vx = 0, vy = 0;
+  const rec = samples.filter(s => now - s.t < 100);
+  if (rec.length >= 2 && now - rec[rec.length - 1].t < 50) {
+    const a = rec[0], b = rec[rec.length - 1], dt = (b.t - a.t) / 1000;
+    if (dt > 0.01) { vx = (b.x - a.x) / dt; vy = (b.y - a.y) / dt; }
+  }
+  if (Math.hypot(vx, vy) > 220) {
+    // 던지기: 위로 빠를수록 깊이 방향으로 멀리
+    const up = Math.max(0, -vy);
+    c.state = 'fly';
+    c.vx = vx * CUPZ / F * 0.6;
+    c.vz = Math.min(8, up * 0.0085);
+    c.vy = vy < 0 ? Math.min(6, 1.0 + up * 0.0042) : -vy * CUPZ / F * 0.5;
+    return;
+  }
+  place(c);
+}
+
+function place(c) {
+  c.state = 'counter'; c.y = CT; c.z = CUPZ; c.vx = c.vy = c.vz = 0;
+  c.x = Math.max(-2.3, Math.min(2.3, c.x));
+  for (const k of ['ice', 'esp', 'water']) if (Math.abs(c.x - ST[k]) < 0.3) c.x = ST[k];
+}
+
+// ===== 업데이트 =====
+function update(dt) {
+  if (state === 'play') elapsed = (performance.now() - t0) / 1000;
+  if (drag) moveDrag();
+
+  // 제빙기 / 정수기
+  if (hold) {
+    const c = cupAt(ST[hold]);
+    if (c && !c.failed) {
+      if (hold === 'ice') { c.ice += ICE_RATE * dt; if (c.ice > ICE_LINE + GRACE) overflow(c); }
+      else { c.water += WATER_RATE * dt; if (level(c) > WAT_LINE + GRACE) overflow(c); }
+    }
+  }
+
+  // 에스프레소
+  esp.pourT -= dt;
+  for (let i = esp.brew.length - 1; i >= 0; i--) {
+    const b = esp.brew[i]; b.t += dt;
+    if (b.t >= BREW_TIME) {
+      esp.brew.splice(i, 1);
+      const c = cupAt(ST.esp);
+      if (c) addShot(c); else { esp.ready++; pop('샷 준비 완료', M.esp.x, BY - 58, '#e0b080'); }
+    }
+  }
+  if (esp.ready > 0 && esp.pourT <= 0) { const c = cupAt(ST.esp); if (c) { esp.ready--; addShot(c); } }
+
+  for (const c of cups) {
+    if (c.born > 0) c.born -= dt;
+    if (c.spill > 0) {
+      c.spill -= dt;
+      if (Math.random() < 0.6) {
+        const side = Math.random() < 0.5 ? -1 : 1;
+        part(c.x + side * CUP_W * 0.5, c.y + CUP_H, c.z, side * 0.3, 0.2, 0,
+          c.ice > level(c) && Math.random() < 0.5 ? '#f4fcff' : liqColor(c), 0.02, 2);
+      }
+    }
+    if (c.state !== 'fly') continue;
+    const py = c.y, pz = c.z;
+    c.vy -= GRAV * dt;
+    c.x += c.vx * dt; c.y += c.vy * dt; c.z += c.vz * dt;
+    if (Math.abs(c.x) > RW - 0.08) { c.x = Math.sign(c.x) * (RW - 0.08); c.vx *= -0.4; }
+    if (c.z > ZF - 0.08) { c.z = ZF - 0.08; c.vz *= -0.3; }
+    if (Math.abs(c.x) < SINK.hw) {
+      if (pz < SINK.z0 && c.z >= SINK.z0 && c.y < SINK.rim) { c.z = SINK.z0 - 0.01; c.vz *= -0.3; }
+      else if (Math.abs(c.x) < SINK.hw - 0.06 && c.z > SINK.z0 + 0.04 && py > SINK.rim && c.y <= SINK.rim) { goal(c); continue; }
+    }
+    if (c.z < CZ1 && c.y <= CT && c.vy < 0) { place(c); continue; }
+    if (c.y <= FLOOR) shatter(c);
+  }
+  cups = cups.filter(c => c.state !== 'gone');
+
+  for (const p of parts) {
+    p.life -= dt;
+    if (p.stuck) continue;
+    p.vy -= GRAV * dt;
+    p.x += p.vx * dt; p.y += p.vy * dt; p.z += p.vz * dt;
+    if (!p.solid) continue;
+    let gy = FLOOR;
+    if (p.z < CZ1 && p.z > 0.9) gy = CT;
+    else if (Math.abs(p.x) < SINK.hw && p.z > SINK.z0) gy = SINK.rim;
+    if (p.y <= gy) {
+      p.y = gy; p.stuck = true;
+      if (gy === CT) p.life = Math.min(p.life, 1.5);
+      if (gy === SINK.rim) p.life = 0;
+    }
+    if (Math.abs(p.x) > RW) p.x = Math.sign(p.x) * RW;
+    if (p.z > ZF) p.z = ZF;
+  }
+  parts = parts.filter(p => p.life > 0);
+}
+
+// ===== 그리기 =====
+function drawParts(filter) {
+  for (const p of parts) {
+    if (!filter(p) || p.z < 0.5) continue;
+    const [sx, sy, s] = P(p.x, p.y, p.z), n = Math.max(1, Math.round(p.sz * s));
+    g.globalAlpha = p.life < 1 ? Math.max(0, p.life) : 1;
+    R(sx - n / 2, sy - n, n, n, p.c);
+  }
+  g.globalAlpha = 1;
+}
+
+function drawCup(c) {
+  const [sx, sy, s0] = P(c.x, c.y, c.z);
+  const s = s0 * (c.born > 0 ? 1 + c.born : 1);
+  const w = Math.max(3, Math.round(CUP_W * s)), h = Math.max(5, Math.round(CUP_H * s));
+  const bx = Math.round(sx), by = Math.round(sy), top = by - h;
+  const lv = level(c), lc = liqColor(c);
+  for (let r = 0; r < h; r++) {
+    const rw = Math.round(w * (1 - 0.25 * r / (h - 1))), x0 = bx - (rw >> 1), f = 1 - (r + 0.5) / h;
+    R(x0, top + r, rw, 1, f <= lv ? lc : 'rgba(235,246,252,0.5)');
+    if (f <= c.ice) for (let k = 1; k < rw - 1; k++)
+      if (((k >> 1) + (r >> 1)) % 2 === 0) R(x0 + k, top + r, 1, 1, f <= lv ? 'rgba(255,255,255,0.45)' : '#eaf8ff');
+    R(x0, top + r, 1, 1, '#c3d6e0'); R(x0 + rw - 1, top + r, 1, 1, '#c3d6e0');
+  }
+  R(bx - (w >> 1) - 1, top - 1, w + 2, 1, '#ffffff');
+  R(bx - (w >> 1) + 1, by - 1, w - 2, 1, '#a9bfcb');
+  if (c.state !== 'fly') {
+    const iy = top + Math.round(h * (1 - ICE_LINE)), wy = top + Math.round(h * (1 - WAT_LINE));
+    R(bx - (w >> 1) - 2, iy, 3, 1, '#ff5d8f'); R(bx + (w >> 1) - 1, wy, 3, 1, '#3a7bff');
+    if (isOk(c)) { R(bx + 1, top - 6, 1, 8, '#ff5d8f'); R(bx + 1, top - 6, 3, 1, '#ff5d8f'); }
+    // 상태 표시 [얼음][샷][샷][물]
+    const cols = c.failed ? ['#ff3b3b', '#ff3b3b', '#ff3b3b', '#ff3b3b'] : [
+      c.ice < 0.02 ? '#6e6478' : c.ice < ICE_MIN ? '#ffd25a' : '#9fe8ff',
+      c.shots > 2 ? '#ff8a3d' : c.shots >= 1 ? '#b0703a' : '#6e6478',
+      c.shots > 2 ? '#ff8a3d' : c.shots >= 2 ? '#b0703a' : '#6e6478',
+      c.water < 0.02 ? '#6e6478' : lv < WAT_MIN ? '#ffd25a' : '#3a8bff'];
+    const iy2 = top - 10;
+    R(bx - 9, iy2 - 1, 18, 5, 'rgba(20,12,28,0.7)');
+    cols.forEach((col, i) => R(bx - 8 + i * 4, iy2, 3, 3, col));
+  }
+}
+
+function drawShadow(c) {
+  const [sx, sy, s] = P(c.x, FLOOR, c.z);
+  g.globalAlpha = 0.3; blob(Math.round(sx), Math.round(sy), CUP_W * s * 0.6, Math.max(1, CUP_W * s * 0.2), '#000'); g.globalAlpha = 1;
+}
+
+function drawMachines(t) {
+  // 컵 거치대
+  let x = M.rack.x, by = BY;
+  R(x - 18, by - 3, 36, 3, '#7a5638'); R(x - 16, by - 5, 32, 2, '#9b6e48');
+  for (let k = 0; k < 3; k++) {
+    const cx = x - 14 + k * 10;
+    R(cx, by - 27, 8, 22, '#eaf4f8'); R(cx, by - 27, 8, 1, '#ffffff');
+    for (let yy = by - 24; yy < by - 5; yy += 4) R(cx, yy, 8, 1, '#b9cdd6');
+    R(cx + 1, by - 26, 1, 18, '#ffffff');
+  }
+  R(x - 8, by - 33, 16, 5, '#ff9db5'); R(x - 6, by - 31, 12, 1, '#ffffff');
+
+  // 제빙기
+  x = M.ice.x;
+  R(x - 20, by - 60, 40, 60, '#dfe8ee'); R(x - 20, by - 60, 40, 6, '#aebbc6'); R(x + 18, by - 54, 2, 54, '#c3cfd8');
+  R(x - 4, by - 51, 8, 2, '#5fb6e0'); R(x - 1, by - 54, 2, 8, '#5fb6e0'); R(x - 3, by - 53, 1, 1, '#5fb6e0'); R(x + 2, by - 48, 1, 1, '#5fb6e0');
+  R(x - 11, by - 37, 22, 35, '#4a5866'); R(x - 4, by - 37, 8, 4, '#8796a3');
+  R(x - 12, by - 3, 24, 3, '#6c7a87');
+  R(x + 12, by - 52, 4, 3, hold === 'ice' ? '#7fe0ff' : '#2f6f8f');
+
+  // 에스프레소 머신
+  x = M.esp.x;
+  R(x - 28, by - 50, 56, 4, '#8e3434'); R(x - 26, by - 46, 52, 46, '#d65a5a'); R(x + 22, by - 46, 4, 46, '#b54545');
+  R(x - 22, by - 44, 44, 10, '#d9dde2');
+  R(x - 18, by - 43, 7, 7, '#ffffff'); R(x - 15, by - 41, 1, 3, '#d33');
+  R(x + 11, by - 43, 7, 7, '#ffffff'); R(x + 14, by - 41, 1, 3, '#d33');
+  R(x - 14, by - 27, 28, 25, '#5a2626');
+  R(x - 7, by - 34, 14, 5, '#9aa3ad'); R(x + 7, by - 32, 12, 3, '#2b2b2b'); R(x - 3, by - 29, 6, 3, '#6b737c');
+  R(x - 15, by - 3, 30, 3, '#555'); for (let k = -13; k < 14; k += 3) R(x + k, by - 3, 1, 1, '#333');
+  // 추출 진행 바 / 준비된 샷
+  esp.brew.forEach((b, i) => {
+    R(x - 24, by - 58 + i * 4, 20, 3, '#331a1a');
+    R(x - 24, by - 58 + i * 4, 20 * Math.min(1, b.t / BREW_TIME), 3, '#ffcc44');
+  });
+  for (let i = 0; i < Math.min(esp.ready, 4); i++) {
+    const gx = x + 2 + i * 6;
+    R(gx, by - 59, 5, 9, '#eef6fa'); R(gx + 1, by - 55, 3, 4, '#3b2010'); R(gx + 1, by - 56, 3, 1, '#c48a4a');
+  }
+  const cupE = cupAt(ST.esp);
+  const streamTo = cupE ? by + 5 - Math.round(CUP_H * P(0, CT, CUPZ)[2]) : by - 3;
+  if (esp.brew.length && Math.floor(t * 8) % 2 === 0) R(x - 1, by - 26, 1, streamTo - (by - 26), '#6a3a18');
+  if (esp.pourT > 0) R(x - 1, by - 26, 2, streamTo - (by - 26), '#3b2010');
+
+  // 정수기
+  x = M.water.x;
+  R(x - 11, by - 78, 22, 23, '#8fd3f4'); R(x - 9, by - 76, 3, 18, '#d4f1ff'); R(x - 11, by - 66, 22, 1, '#6bbde6');
+  R(x - 5, by - 80, 10, 3, '#3b7fb5');
+  R(x - 15, by - 55, 30, 55, '#e9eef2'); R(x + 13, by - 55, 2, 55, '#cbd5dc');
+  R(x - 10, by - 37, 20, 35, '#4a5866'); R(x - 3, by - 37, 6, 4, '#3b7fb5');
+  R(x - 11, by - 3, 22, 3, '#6c7a87');
+  R(x + 6, by - 50, 4, 3, hold === 'water' ? '#7fe0ff' : '#2f6f8f');
+
+  // 얼음 / 물 줄기
+  if (hold) {
+    const mx = M[hold].x, c = cupAt(ST[hold]);
+    let end = by - 3;
+    if (c) { const [, sy, s] = P(c.x, c.y, c.z); end = Math.round(sy - CUP_H * s * Math.max(hold === 'ice' ? c.ice : level(c), 0.05)); }
+    if (hold === 'water') { R(mx - 1, by - 33, 2, end - (by - 33), '#7fd0f5'); R(mx, by - 33, 1, end - (by - 33), '#d4f1ff'); }
+    else for (let yy = by - 33; yy < end; yy += 3) if (Math.random() < 0.7) R(mx - 2 + Math.floor(Math.random() * 3), yy, 2, 2, '#f4fcff');
+  }
+}
+
+function drawDecals() {
+  for (const d of decals) {
+    const [sx, sy, s] = P(d.x, FLOOR, d.z), rx = d.r * s, ry = Math.max(1, rx * 1.8 / d.z);
+    g.globalAlpha = 0.75;
+    blob(Math.round(sx), Math.round(sy), rx, ry, d.c);
+    blob(Math.round(sx + rx * 0.5 * (d.r2 - 0.5) * 2), Math.round(sy + ry * 0.3), rx * 0.6, ry * 0.7, d.c);
+    g.globalAlpha = 1;
+  }
+}
+
+function draw(t) {
+  g.drawImage(roomLayer, 0, 0);
+  drawDecals();
+  drawParts(p => p.stuck && p.y <= FLOOR + 0.01);
+  g.drawImage(sinkLayer, 0, 0);
+  const far = cups.filter(c => c.state === 'fly' && c.z >= CZ1).sort((a, b) => b.z - a.z);
+  far.forEach(drawShadow);
+  drawParts(p => !(p.stuck && p.y <= FLOOR + 0.01) && p.z >= CZ1);
+  far.forEach(drawCup);
+  g.drawImage(counterLayer, 0, 0);
+  drawMachines(t);
+  for (const c of cups) if (c.state === 'counter') {
+    const [sx, sy, s] = P(c.x, c.y, c.z);
+    g.globalAlpha = 0.18; R(sx - CUP_W * s * 0.5, sy, CUP_W * s, 2, '#000'); g.globalAlpha = 1;
+  }
+  drawParts(p => p.z < CZ1);
+  cups.filter(c => c.state === 'counter').forEach(drawCup);
+  cups.filter(c => c.state === 'fly' && c.z < CZ1).forEach(drawCup);
+  if (drag) drawCup(drag);
+}
+
+// ===== HUD / 흐름 =====
+const $ = id => document.getElementById(id);
+const fmt = v => v.toFixed(2) + '초';
+function hud() {
+  $('time').textContent = '⏱ ' + fmt(elapsed);
+  $('best').textContent = best ? '최고 ' + fmt(best) : '최고 -';
+  $('goals').textContent = goals ? '🗑 골인 x' + goals : '';
+}
+
+function start() {
+  reset(); state = 'play'; t0 = performance.now();
+  $('ovStart').classList.add('hidden'); $('ovEnd').classList.add('hidden');
+}
+
+function serve() {
+  if (state !== 'play') return;
+  const c = cups.find(c => c.state === 'counter' && isOk(c));
+  if (!c) { pop('아직 완성된 컵이 없어요!', W / 2, H / 2, '#ffb3c9'); return; }
+  state = 'done';
+  elapsed = (performance.now() - t0) / 1000;
+  c.state = 'gone'; cups = cups.filter(x => x !== c);
+  const isNew = !best || elapsed < best;
+  if (isNew) { best = elapsed; try { localStorage.setItem(BEST_KEY, String(best)); } catch (e) {} }
+  $('endTime').textContent = '걸린 시간: ' + fmt(elapsed);
+  $('endBest').textContent = '내 최고 기록: ' + fmt(best);
+  $('endNew').style.display = isNew ? '' : 'none';
+  $('ovEnd').classList.remove('hidden');
+}
+
+$('startBtn').onclick = start;
+$('againBtn').onclick = start;
+$('retry').onclick = start;
+$('serve').onclick = serve;
+$('startBest').textContent = best ? '내 최고 기록: ' + fmt(best) : '';
+
+function fit() {
+  sc = Math.max(2, Math.floor(Math.min((innerWidth - 20) / W, (innerHeight - 100) / H)));
+  wrap.style.width = W * sc + 'px'; wrap.style.height = H * sc + 'px';
+}
+window.addEventListener('resize', fit); fit();
+
+let last = performance.now();
+function loop(now) {
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  update(dt); draw(now / 1000); hud();
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
