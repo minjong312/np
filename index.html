@@ -6,7 +6,7 @@
 <title>[아아 장인]</title>
 <style>
   html, body { margin: 0; height: 100%; overflow: hidden; background: #1a1714; font-family: "Malgun Gothic", "Apple SD Gothic Neo", sans-serif; user-select: none; }
-  canvas { display: block; }
+  canvas { display: block; cursor: crosshair; }
   .hud { position: fixed; pointer-events: none; color: #fff; font-weight: bold; text-shadow: 0 3px 0 #000, 0 0 2px #000; }
   #count { top: 14px; left: 18px; font-size: 30px; }
   #timer { top: 8px; left: 50%; transform: translateX(-50%); font: bold 48px monospace; }
@@ -75,10 +75,10 @@
 <div class="ov" id="ovStart">
   <h1>[아아 장인]</h1>
   <p><b>아이스 아메리카노: 얼음 가득 + 물 80% + 샷 + 뚜껑 + 홀더</b><br>
-    컵 보관대에서 컵 꺼내기 · 컵 들고 카운터 아무 데나 클릭 → 가까운 컵 자리에 놓기 · 정수기 클릭 → 물 자동<br>
-    스쿱 잡기 → 왼손 컵 · 오른손 스쿱 → 아이스빈에서 드래그로 얼음 푸기 → 컵 위로 <b>천천히</b> (급하면 흘림)<br>
-    포터필터: 핸들 잡고 <b>←</b> 드래그로 빼기 → 넉 드로어에서 <b>↓</b> 털기 → 붓 잡고 <b>지그재그</b> → 분쇄기에 거치 후 꾹<br>
-    → 탬퍼 클릭 → 그룹헤드 <b>정확히 아래</b>에서 누르고 <b>→</b> 드래그로 결합 → 초록 버튼으로 추출<br>
+    컵 보관대에서 컵 꺼내기 · 컵 들고 카운터 아무 데나 클릭 → 컵 자리(앞 링 / 정수기 아래)에 놓기 · 정수기 클릭 → 물 자동<br>
+    스쿱 클릭 → 왼손 컵 · 오른손 스쿱 → 아이스빈에서 누르고 드래그로 푸기 → 컵 위에서 누르고 <b>천천히</b> (급하면 흘림)<br>
+    포터필터: 핸들 잡고 <b>←</b> 드래그로 빼기 → 드로어 위에서 <b>↓</b> 털기 → 붓 클릭 후 <b>지그재그</b> → 분쇄기에 거치(자동 분쇄)<br>
+    → 탬퍼 클릭 → 그룹헤드 <b>정확히 아래</b>로 화면 안쪽으로 밀어 넣기(자동 결합) → 초록 버튼으로 추출 → 샷잔 집어 컵 클릭<br>
     컵 들고 머신 위 뚜껑 · 홀더 클릭 → 완성! · 우클릭 = 내려놓기 · 컵 들고 휙 던지면 싱크대 골인</p>
   <p id="startBest"></p>
   <div class="modes">
@@ -123,14 +123,14 @@ const ATTACH_TOL_X = 0.022, ATTACH_TOL_Z = 0.03, ATTACH_NEAR = 0.12;
 const LOCK_PX = 130, SLIP_PX = 60;
 const BREW_TIME = 3, WATER_RATE = 0.55, WATER_TARGET = 0.8, GRIND_TIME = 1.4;
 const CUP_ICE_MAX = 15, SCOOP_CUBES = CUP_ICE_MAX; // 스쿱 한 번 = 컵 가득
-// 손·들고 있는 물건이 못 들어가는 기기 영역 [minX, maxX, minZ, maxZ, botY, topY]
+// 손·들고 있는 물건이 못 들어가는 영역 [minX, maxX, minZ, maxZ, botY, topY, 앞으로만 밀기]
+// 기기 줄은 카운터 왼쪽 끝부터 컵 보관대까지 틈 없이 이어서 뒷벽까지 막음 (사이·옆 공간 포함)
 const BLOCKS = [
-  [-0.74, -0.5, -0.58, -0.29, TOP, TOP + 0.95],            // 분쇄기 몸통
-  [-0.48, 0.48, -0.65, -0.37, TOP, TOP + 0.65],            // 머신 몸체 (그룹헤드 아래 공간은 비움)
-  [-0.48, 0.48, -0.65, -0.21, TOP + 0.46, TOP + 0.65],     // 머신 상단 패널
-  [-0.48, 0.48, -0.65, -0.21, TOP, TOP + 0.18],            // 머신 받침·드립 트레이
-  [0.49, 0.71, -0.65, -0.25, TOP, TOP + 0.84],             // 정수기
-  [0.73, 1.07, -0.53, -0.23, TOP, TOP + 0.36],             // 컵 보관대
+  [-1.2, -0.47, -0.8, -0.29, TOP, TOP + 1.2, true],         // 왼쪽 끝 ~ 분쇄기
+  [-0.48, 0.48, -0.8, -0.37, TOP, TOP + 1.2, true],         // 머신 몸체 (그룹헤드 아래 공간은 비움)
+  [-0.48, 0.48, -0.8, -0.21, TOP + 0.46, TOP + 1.2, true],  // 머신 상단 패널
+  [-0.48, 0.48, -0.8, -0.21, TOP, TOP + 0.18, true],        // 머신 받침·드립 트레이
+  [0.47, 1.08, -0.8, -0.23, TOP, TOP + 1.2, true],          // 정수기 ~ 컵 보관대
   [SCOOP_X - 0.07, SCOOP_X + 0.07, -0.38, -0.22, TOP, TOP + 0.1], // 스쿱통
 ];
 const COL = {
@@ -166,7 +166,7 @@ function add(parent, geo, color, x, y, z, opt = {}) {
   if (opt.ry) m.rotation.y = opt.ry;
   if (opt.rz) m.rotation.z = opt.rz;
   m.castShadow = !opt.noShadow; m.receiveShadow = true;
-  if (!opt.noLine) m.add(new THREE.LineSegments(new THREE.EdgesGeometry(geo, 25), lineMat));
+  if (!opt.noLine) m.add(new THREE.LineSegments(new THREE.EdgesGeometry(geo, 25), opt.lineMat || lineMat));
   if (opt.tag) { m.userData.tag = opt.tag; pickables.push(m); }
   parent.add(m);
   return m;
@@ -317,7 +317,7 @@ const pfContent = {
   puck: add(pfG, new THREE.CylinderGeometry(0.043, 0.043, 0.006, 12), '#3a2414', 0, 0.016, 0, { noLine: true }),
   dirty: add(pfG, new THREE.CylinderGeometry(0.043, 0.043, 0.004, 12), '#8a7864', 0, 0.016, 0, { noLine: true }),
   ground: add(pfG, new THREE.ConeGeometry(0.045, 0.03, 12), '#7a4e2c', 0, 0.03, 0, { noLine: true }),
-  tamped: add(pfG, new THREE.CylinderGeometry(0.043, 0.043, 0.006, 12), '#5a361e', 0, 0.014, 0, { noLine: true }),
+  tamped: add(pfG, new THREE.CylinderGeometry(0.043, 0.043, 0.008, 12), '#7a4e2c', 0, 0.014, 0, { noLine: true }),
 };
 tagAll(pfG, 'pf');
 scene.add(pfG);
@@ -347,7 +347,7 @@ for (let i = 0; i < SCOOP_CUBES; i++) {
     { mat: mat(COL.ice, { transparent: true, opacity: 0.92 }), noShadow: true });
   scoopCubes.push(c);
 }
-tagAll(scoopG, 'scoop'); scene.add(scoopG);
+tagAll(scoopG, 'scoop', { tool: true }); scene.add(scoopG);
 
 // 손
 function makeHand(sleeve = true) {
@@ -367,6 +367,10 @@ function makeHand(sleeve = true) {
 }
 const rHand = makeHand(), lHand = makeHand();
 rHand.rotation.y = 0.25; lHand.rotation.y = -0.35;
+// 무언가를 들고 있을 때 오른손이 화면을 가리지 않게 반투명 처리하려고 재질을 따로 둠
+const ownMats = obj => { const list = []; obj.traverse(o => { if (o.material) { o.material = o.material.clone(); o.material.transparent = true; list.push(o.material); } }); return list; };
+const rHandMats = ownMats(rHand), pfMats = ownMats(pfG);
+const setAlpha = (list, a) => list.forEach(m => { if (m.userData.base === undefined) m.userData.base = m.opacity; m.opacity = m.userData.base * a; });
 const L_REST = new V3(-0.15, TOP + 0.05, 0.32);
 
 // 물줄기 / 샷 줄기
@@ -430,8 +434,8 @@ function pop(text, pos, big = false) {
 
 // ===== 컵 자리 (카운터 아무 데나 클릭 → 가장 가까운 빈 자리) =====
 const SLOTS = [
-  { id: 'water', pos: SPOT.water }, { id: 'group', pos: SPOT.group },
-  ...[0.15, 0.33, 0.6, 0.85, 1.5, 1.8].map((x, i) => ({ id: 'c' + i, pos: new V3(x, TOP, 0.0) })),
+  { id: 'water', pos: SPOT.water },
+  { id: 'c0', pos: new V3(0.85, TOP, 0.0) }, // 카운터 컵 자리 (한 곳)
 ];
 for (const sl of SLOTS) if (sl.id[0] === 'c') {
   const ring = new THREE.Mesh(new THREE.RingGeometry(0.04, 0.05, 20), new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.45 }));
@@ -440,13 +444,20 @@ for (const sl of SLOTS) if (sl.id[0] === 'c') {
 
 // ===== 컵 =====
 const cupShellGeo = new THREE.CylinderGeometry(0.045, 0.035, 0.13, 14);
-const cupShellMat = new THREE.MeshStandardMaterial({ color: COL.glass, transparent: true, opacity: 0.45, flatShading: true });
+const cupShellMat = new THREE.MeshStandardMaterial({ color: COL.glass, transparent: true, opacity: 0.3, flatShading: true });
 const liquidGeo = new THREE.CylinderGeometry(0.041, 0.034, 1, 14);
 const waterMat = new THREE.MeshStandardMaterial({ color: '#a8dcf0', transparent: true, opacity: 0.6 });
 const coffeeMat = new THREE.MeshStandardMaterial({ color: '#5a3418', transparent: true, opacity: 0.88 });
 const espMat = new THREE.MeshStandardMaterial({ color: '#2e180a' });
-const cubeGeo = new THREE.BoxGeometry(0.025, 0.022, 0.025);
-const cubeMat = mat(COL.ice, { transparent: true, opacity: 0.9 });
+
+// 샷잔: 머신 드립 트레이 위(그룹헤드 아래)에 있음 → 샷을 받아 컵에 옮겨 담기
+const glass = { where: 'tray', full: false, g: new THREE.Group(), pour: null, pos: SPOT.group.clone() };
+add(glass.g, new THREE.CylinderGeometry(0.027, 0.022, 0.065, 12), '', 0, 0.0325, 0, { mat: new THREE.MeshStandardMaterial({ color: '#eef6fa', transparent: true, opacity: 0.55, flatShading: true }) });
+glass.fill = add(glass.g, new THREE.CylinderGeometry(0.024, 0.02, 0.04, 12), '', 0, 0.022, 0, { mat: espMat, noLine: true, noShadow: true });
+tagAll(glass.g, 'glass'); scene.add(glass.g);
+const GLASS_H = 0.065;
+const cubeGeo = new THREE.BoxGeometry(0.03, 0.026, 0.03);
+const cubeMat = mat('#f4fbff', { transparent: true, opacity: 0.95 });
 let cups = [];
 
 function makeCup() {
@@ -456,7 +467,7 @@ function makeCup() {
   c.liquid = add(g, liquidGeo, '', 0, 0, 0, { mat: waterMat, noLine: true, noShadow: true });
   c.cubes = [];
   for (let i = 0; i < CUP_ICE_MAX; i++) {
-    const m = add(g, cubeGeo, '', -0.016 + (i % 3) * 0.016, 0.014 + Math.floor(i / 3) * 0.025, -0.01 + ((i * 7) % 3) * 0.01, { mat: cubeMat, noLine: true, noShadow: true });
+    const m = add(g, cubeGeo, '', -0.017 + (i % 3) * 0.017, 0.016 + Math.floor(i / 3) * 0.026, -0.012 + ((i * 7) % 3) * 0.012, { mat: cubeMat, noShadow: true });
     m.rotation.set(i, i * 2, 0); c.cubes.push(m);
   }
   c.lidM = cyl(g, 0.049, 0.049, 0.014, '#ffffff', 0, 0.13, 0, 14);
@@ -522,11 +533,11 @@ function spillIce(pos, vel) { part(cubeGeo, cubeMat, pos, vel, { shadow: true, l
 
 // ===== 게임 상태 =====
 let phase = 'ready', mode = 'timed', timeLeft = GAME_TIME, elapsed = 0, count = 0, goals = 0, best = 0, bestLap = 0;
-let laps = [], lapStart = 0, waterFill = null;
+let laps = [], lapStart = 0, waterFill = null, grinding = false;
 try { best = parseInt(localStorage.getItem(BEST_KEY)) || 0; bestLap = parseFloat(localStorage.getItem(LAP_KEY)) || 0; } catch (e) {}
 let right = null;      // null | {type:'cup', cup} | {type:'pf'}
 let leftHold = null;   // null | {type:'cup', cup} | {type:'pf'}
-const pf = { where: 'group', state: 'puck', grind: 0, rot: 0, knockY: 0 };
+const pf = { where: 'group', state: 'puck', grind: 0, rot: 0, knockY: 0, brush: 0, magnet: false, magY0: null };
 let brew = null, gesture = null, tamp = null, brewPress = 0;
 const scoop = { cubes: 0, fill: 0, active: false, pos: SCOOP_HOME.clone(), prev: new V3(), speed: 0, pourT: 0, tilt: 0, yaw: 0, near: false };
 
@@ -534,10 +545,11 @@ function resetGame() {
   cups.slice().forEach(removeCup);
   parts.forEach(p => scene.remove(p.m)); parts = [];
   puddles.forEach(m => scene.remove(m)); puddles = [];
-  Object.assign(pf, { where: 'group', state: 'puck', grind: 0, rot: 0, knockY: 0 });
+  Object.assign(pf, { where: 'group', state: 'puck', grind: 0, rot: 0, knockY: 0, brush: 0, magnet: false, magY0: null });
   right = leftHold = brew = gesture = tamp = null;
   scoop.active = false; scoop.cubes = 0; scoop.pos.copy(SCOOP_HOME);
-  timeLeft = GAME_TIME; elapsed = 0; count = 0; goals = 0; laps = []; lapStart = 0; waterFill = null;
+  Object.assign(glass, { where: 'tray', full: false, pour: null }); glass.pos.copy(SPOT.group);
+  timeLeft = GAME_TIME; elapsed = 0; count = 0; goals = 0; laps = []; lapStart = 0; waterFill = null; grinding = false;
   $('fx').innerHTML = '';
 }
 
@@ -560,7 +572,8 @@ function excluded(o) {
   const u = o.userData;
   if (u.cup && (u.cup.where === 'right' || u.cup.where === 'fly')) return true;
   if (u.tag === 'pf' && (pf.where === 'right' || pf.where === 'seat')) return true;
-  if ((u.tag === 'scoop' && scoop.active) || (u.tag === 'brush' && gesture?.kind === 'brush')) return true;
+  if (u.tag === 'glass' && glass.where !== 'tray') return true;
+  if ((u.tool && scoop.active) || (u.tag === 'brush' && right?.type === 'brush')) return true;
   return false;
 }
 function shown(o) { for (; o; o = o.parent) if (!o.visible) return false; return true; }
@@ -586,7 +599,7 @@ cv.addEventListener('mousedown', e => {
   if (phase !== 'play') return;
   mouse.x = e.clientX; mouse.y = e.clientY; updNdc();
   if (e.button === 2) { if (!gesture && !tamp) dropRight(); return; }
-  if (e.button !== 0 || gesture || tamp) return;
+  if (e.button !== 0 || gesture || tamp || glass.pour) return;
   mouse.down = true;
   samples = [{ t: performance.now(), x: mouse.x, y: mouse.y }];
   onDown();
@@ -599,7 +612,16 @@ $('done').addEventListener('click', e => { complete(); e.currentTarget.blur(); }
 // ----- 누름 -----
 function onDown() {
   const hit = pick(), tag = hit?.tag;
+  if (right?.type === 'glass') return downWithGlass(hit, tag);
+  if (tag === 'glass' && !right) {
+    if (brew) return sign('추출 중이에요!');
+    glass.where = 'right'; right = { type: 'glass' }; SFX.click(); return;
+  }
+  if (right?.type === 'scoop') { if (tag === 'scoop') return putScoop(); gesture = { kind: 'scoopUse' }; return; }
+  if (right?.type === 'brush') { gesture = { kind: 'brushUse', lastX: mouse.x, dir: 0, anchor: mouse.x }; return; }
   if (tag === 'scoop') return grabScoop();
+  if (tag === 'brush' && (!right || right.type === 'pf')) return grabBrush();
+  if (tag === 'tamper' && (!right || right.type === 'pf')) return startTamp();
   if (tag === 'water' && right?.type !== 'cup') return startWater();
   if (right?.type === 'cup') { gesture = { kind: 'cupClick', hit }; return; }
   if (right?.type === 'pf') return downWithPF(hit, tag);
@@ -626,23 +648,23 @@ function downEmpty(hit, tag) {
     case 'grinder':
       if (pf.where !== 'fork') return sign('포터필터를 들고 분쇄기를 클릭해 거치하세요');
       if (pf.grind >= 1) return sign('원두가 이미 가득해요', true);
-      gesture = { kind: 'grind', t: 0 }; return;
+      grinding = true; return;
     case 'brew': return doBrew();
     case 'iceBin': return sign('스쿱통의 스쿱을 잡고 드래그하세요', true);
-    case 'brush':
-      if (pf.where !== 'left') return sign('포터필터를 든 채 붓을 클릭하세요');
-      return startBrush();
-    case 'tamper': return sign('포터필터를 든 채 탬퍼를 클릭하세요');
     case 'lid': case 'sleeve': return sign('컵을 든 채 클릭하세요');
-    case 'knock': return sign('포터필터를 든 채 드로어를 누르고 ↓ 드래그');
+    case 'knock': return sign('포터필터를 든 채 드로어 위에서 ↓ 내리기');
   }
 }
 
 // 기기 안으로 못 들어가게 가장 가까운 바깥 면으로 밀어냄 (r: 반경, h: 물건 높이)
 function blockOut(p, r = 0.04, h = 0.04) {
   if (!p) return p;
-  for (const [x0, x1, z0, z1, y0, y1] of BLOCKS) {
+  for (const [x0, x1, z0, z1, y0, y1, frontOnly] of BLOCKS) {
     if (p.y + h < y0 || p.y > y1) continue;
+    if (frontOnly) { // 벽에 붙은 기기 줄: 항상 앞쪽 면으로
+      if (p.x > x0 && p.x < x1 && p.z < z1 + r) p.z = z1 + r;
+      continue;
+    }
     const ax0 = x0 - r, ax1 = x1 + r, az0 = z0 - r, az1 = z1 + r;
     if (p.x <= ax0 || p.x >= ax1 || p.z <= az0 || p.z >= az1) continue;
     const d = [p.x - ax0, ax1 - p.x, p.z - az0, az1 - p.z];
@@ -651,56 +673,72 @@ function blockOut(p, r = 0.04, h = 0.04) {
   }
   return p;
 }
-function pfBasketTarget() { return blockOut(onPlane(GROUP.y) || new V3(), 0.035, 0.03); }
+function pfBasketTarget() { return blockOut(onPlane(GROUP.y) || new V3(), 0.06, 0.03); } // 머신 앞면 z = GROUP.z
 
 function downWithPF(hit, tag) {
-  const b = pfBasketTarget();
-  const dx = b.x - GROUP.x, dz = b.z - GROUP.z;
-  // 도구를 직접 누른 경우가 결합 판정보다 우선
-  const tool = ['knock', 'brush', 'grinder', 'tamper'].includes(tag);
-  if (!tool && Math.hypot(dx, dz) < ATTACH_NEAR) {
-    if (Math.abs(dx) < ATTACH_TOL_X && Math.abs(dz) < ATTACH_TOL_Z) {
-      pf.where = 'seat'; pf.rot = -Math.PI / 4; right = null; SFX.click();
-      gesture = { kind: 'pfAttach', x0: mouse.x, y0: mouse.y };
-    } else {
-      SFX.clank(); pf.shake = 0.3; sign('안 맞아요! 그룹헤드 정확히 아래로');
-    }
-    return;
-  }
   switch (tag) {
     case 'knock': gesture = { kind: 'knock', y0: mouse.y, hit: false, anim: -1 }; return;
-    case 'brush':
-      if (pf.state === 'puck' || pf.state === 'tamped' || (pf.state === 'clean' && pf.grind > 0))
-        return sign('먼저 넉 드로어에 털어요');
-      if (leftHold) return sign('왼손이 바빠요');
-      pf.where = 'left'; leftHold = { type: 'pf' }; right = null;
-      return startBrush();
     case 'grinder':
       if (pf.state === 'puck' || pf.state === 'tamped') return sign('먼저 넉 드로어에 털어요');
       if (pf.state === 'dirty') return sign('붓으로 먼저 닦아요');
-      pf.where = 'fork'; right = null; SFX.click(); return;
-    case 'tamper':
-      if (pf.state === 'tamped') return sign('이미 탬핑했어요', true);
-      if (pf.state !== 'clean' || pf.grind < 1) return sign('원두를 가득 받은 뒤 탬핑해요');
-      if (leftHold) return sign('왼손이 바빠요');
-      pf.where = 'left'; leftHold = { type: 'pf' }; right = null;
-      tamp = { t: 0 }; return;
+      pf.where = 'fork'; right = null; SFX.click();
+      grinding = pf.grind < 1; // 거치하면 한 번에 가득 분쇄
+      return;
     case 'counter': pf.where = 'rest'; right = null; SFX.click(); return;
   }
 }
 
 // 스쿱을 누르면 항상 왼손 = 컵, 오른손 = 스쿱
+function downWithGlass(hit, tag) {
+  if (tag === 'cup') {
+    const c = hit.obj.userData.cup;
+    if (!glass.full) return sign('샷잔이 비어 있어요');
+    if (c.lid) return sign('뚜껑이 닫혀 있어요');
+    if (c.shot) return sign('이미 샷이 들어 있어요', true);
+    glass.pour = { cup: c, t: 0 }; return;
+  }
+  if (tag === 'machine' || tag === 'brew' || tag === 'glass') { glass.where = 'tray'; right = null; SFX.click(); return; }
+}
 function grabScoop() {
+  if (right && right.type !== 'cup') return sign('오른손을 먼저 비우세요 (우클릭)');
   if (leftHold?.type === 'pf') return sign('왼손이 바빠요');
-  if (right?.type === 'pf') return sign('포터필터를 먼저 내려놓으세요 (우클릭)');
   if (!leftHold) {
     let c;
-    if (right?.type === 'cup') { c = right.cup; right = null; }
-    else c = makeCup(); // 손에 컵이 없으면 새 컵을 왼손에
+    if (right?.type === 'cup') c = right.cup;
+    else c = cupAt('c0') || makeCup(); // 손에 컵이 없으면 카운터 자리의 컵, 그것도 없으면 새 컵
     c.where = 'left'; leftHold = { type: 'cup', cup: c };
   } else if (right?.type === 'cup') return sign('양손이 다 찼어요');
   if (leftHold.cup.lid) return sign('뚜껑이 닫혀 있어요');
-  startScoop();
+  right = { type: 'scoop' };
+  scoop.active = true; scoop.cubes = 0; scoop.fill = 0; scoop.pourT = 0; scoop.prev.copy(scoop.pos); SFX.click();
+}
+function putScoop() {
+  // 남은 얼음: 빈 위면 돌려놓고, 아니면 흘림
+  if (scoop.cubes > 0 && !scoopInBin(scoop.pos))
+    for (let i = 0; i < scoop.cubes; i++) spillIce(scoop.pos.clone(), new V3((Math.random() - 0.5) * 0.5, 0.2, (Math.random() - 0.5) * 0.5));
+  scoop.active = false; scoop.cubes = 0; scoop.near = false; right = null; gesture = null; SFX.click();
+}
+// 붓·탬퍼를 누르면 포터필터가 어디 있든(머신 결합 제외) 왼손으로 자동으로 들림
+function pfToLeft() {
+  if (pf.where === 'left') return true;
+  if (pf.where === 'group' || pf.where === 'seat') { sign('포터필터를 먼저 ← 드래그로 빼세요'); return false; }
+  if (leftHold) { sign('왼손이 바빠요'); return false; }
+  if (right && right.type !== 'pf') { sign('오른손을 먼저 비우세요 (우클릭)'); return false; }
+  if (pf.where === 'right') right = null;
+  grinding = false;
+  pf.where = 'left'; leftHold = { type: 'pf' }; SFX.click();
+  return true;
+}
+function grabBrush() {
+  if (pf.state === 'puck' || pf.state === 'tamped' || (pf.state === 'clean' && pf.grind > 0)) return sign('먼저 넉 드로어에 털어요');
+  if (!pfToLeft()) return;
+  right = { type: 'brush' };
+}
+function startTamp() {
+  if (pf.state === 'tamped') return sign('이미 탬핑했어요', true);
+  if (pf.state !== 'clean' || pf.grind < 1) return sign('원두를 가득 받은 뒤 탬핑해요');
+  if (!pfToLeft()) return;
+  tamp = { t: 0 };
 }
 function startWater() {
   const c = cupAt('water');
@@ -708,13 +746,6 @@ function startWater() {
   if (c.lid) return sign('뚜껑이 닫혀 있어요');
   if (c.water >= WATER_TARGET - 0.001) return sign('물이 이미 80%예요', true);
   waterFill = { cup: c }; SFX.click();
-}
-function startScoop() {
-  scoop.active = true; scoop.cubes = 0; scoop.fill = 0; scoop.pourT = 0; scoop.prev.copy(scoop.pos);
-  gesture = { kind: 'scoop' }; SFX.click();
-}
-function startBrush() {
-  gesture = { kind: 'brush', lastX: mouse.x, dir: 0, anchor: mouse.x, strokes: 0 };
 }
 
 // ----- 뗌 -----
@@ -727,14 +758,6 @@ function onUp() {
     case 'pfRemove': pf.rot = 0; return;
     case 'pfAttach':
       if (pf.where === 'seat') { pf.where = 'right'; pf.rot = 0; right = { type: 'pf' }; sign('끝까지 → 돌려야 잠겨요', true); }
-      return;
-    case 'scoop':
-      // 남은 얼음: 빈 위면 돌려놓고, 아니면 흘림
-      if (scoop.cubes > 0 && !scoopInBin(scoop.pos))
-        for (let i = 0; i < scoop.cubes; i++) spillIce(scoop.pos.clone(), new V3((Math.random() - 0.5) * 0.5, 0.2, (Math.random() - 0.5) * 0.5));
-      scoop.active = false; scoop.cubes = 0; scoop.near = false; return;
-    case 'brush':
-      if (pf.state === 'clean' && pf.where === 'left' && !right) { pf.where = 'right'; leftHold = null; right = { type: 'pf' }; }
       return;
     case 'knock': pf.knockY = 0; pf.flip = 0; return;
   }
@@ -760,8 +783,7 @@ function cupClick(hit) {
   const tag = hit?.tag;
   switch (tag) {
     case 'water': return placeCup(c, 'water');
-    case 'machine': case 'brew': return placeCup(c, 'group');
-    case 'counter': case 'iceBin': case 'cupStack': case 'cup': case 'knock': {
+    case 'counter': case 'iceBin': case 'cupStack': case 'cup': case 'knock': case 'machine': case 'brew': case 'glass': {
       const sl = nearestSlot(hit.point);
       if (!sl) return sign('빈 컵 자리가 없어요');
       return placeCup(c, sl.id);
@@ -785,6 +807,9 @@ function placeCup(c, where) {
 function dropRight() {
   if (!right) return;
   if (right.type === 'pf') { pf.where = 'rest'; right = null; SFX.click(); return; }
+  if (right.type === 'glass') { glass.where = 'tray'; right = null; SFX.click(); return; }
+  if (right.type === 'scoop') return putScoop();
+  if (right.type === 'brush') { right = null; SFX.click(); return; }
   const sl = nearestSlot(right.cup.pos, true); // 우클릭은 카운터 앞쪽 자리에만
   if (!sl) return sign('빈 컵 자리가 없어요');
   placeCup(right.cup, sl.id);
@@ -826,13 +851,16 @@ function complete() {
 function updateHint() {
   const h = pick(), t = h?.tag;
   let s = '';
-  if (right?.type === 'cup') s = { water: '클릭: 정수기 아래에 두기', machine: '클릭: 그룹헤드 아래에 두기', iceBin: '클릭: 왼손으로 컵 잡기', scoop: '누르고 드래그: 왼손에 컵 쥐고 얼음 푸기',
+  if (right?.type === 'scoop') s = t === 'scoop' ? '클릭: 스쿱 내려놓기' : '아이스빈에서 누르고 드래그: 얼음 푸기 → 컵 위에서 누르고 천천히: 담기';
+  else if (right?.type === 'brush') s = '포터필터 위에서 누르고 지그재그: 닦기 · 우클릭: 내려놓기';
+  else if (right?.type === 'cup') s = { water: '클릭: 정수기 아래에 두기', machine: '클릭: 가까운 컵 자리에 놓기', iceBin: '클릭: 왼손으로 컵 잡기', scoop: '누르고 드래그: 왼손에 컵 쥐고 얼음 푸기',
     lid: '클릭: 뚜껑 결합', sleeve: '클릭: 홀더 결합', sink: '클릭: 버리기', counter: '클릭: 가까운 컵 자리에 놓기' }[t] || '휙 던지기 가능 · 우클릭: 내려놓기';
-  else if (right?.type === 'pf') s = { knock: '누르고 ↓ 드래그: 퍽 털기', brush: '누르고 지그재그: 닦기', grinder: '클릭: 분쇄기에 거치', tamper: '클릭: 탬핑', counter: '클릭: 내려놓기' }[t]
-    || '그룹헤드 정확히 아래에서 누르고 → 드래그: 결합';
+  else if (right?.type === 'glass') s = t === 'cup' ? '클릭: 샷 따르기' : '컵을 클릭해 따르기 · 우클릭: 내려놓기';
+  else if (right?.type === 'pf') s = { knock: '드로어 위에서 ↓ 내리기: 퍽 털기', brush: '클릭: 붓 잡기', grinder: '클릭: 분쇄기에 거치', tamper: '클릭: 탬핑', counter: '클릭: 내려놓기' }[t]
+    || '그룹헤드 쪽으로 쭉 밀어 넣으면 자동 결합';
   else s = { cupStack: '클릭: 새 컵', pf: pf.where === 'group' ? '누르고 ← 드래그: 포터필터 빼기' : '클릭: 포터필터 집기', water: '클릭: 물 80%까지 자동',
-    grinder: '꾹 누르기: 분쇄', brew: '클릭: 추출', scoop: '누르고 드래그: 아이스빈에서 얼음 푸기 → 컵 위로', iceBin: '스쿱통의 스쿱을 잡으세요', brush: '누르고 지그재그: 닦기',
-    cup: '클릭: 컵 집기', lid: '컵을 들고 클릭', sleeve: '컵을 들고 클릭' }[t] || '';
+    grinder: '클릭: 분쇄 (자동)', brew: '클릭: 추출', scoop: '클릭: 스쿱 잡기 (왼손에 컵 자동)', iceBin: '스쿱통의 스쿱을 잡으세요', brush: '클릭: 붓 잡기 (포터필터 자동)', tamper: '클릭: 탬핑 (포터필터 자동)',
+    cup: '클릭: 컵 집기', glass: glass.full ? '클릭: 샷잔 집기' : '샷잔 (추출하면 여기에 담겨요)', lid: '컵을 들고 클릭', sleeve: '컵을 들고 클릭' }[t] || '';
   $('hint').textContent = s;
 }
 
@@ -854,7 +882,7 @@ function update(dt, now) {
   if (g?.kind === 'pfRemove') {
     const p = Math.max(0, Math.min(1, (g.x0 - mouse.x) / LOCK_PX));
     pf.rot = -Math.PI / 4 * p;
-    if (p >= 1) { pf.where = 'right'; pf.rot = 0; right = { type: 'pf' }; gesture = null; SFX.lock(); }
+    if (p >= 1) { pf.where = 'right'; pf.rot = 0; pf.wallHit = true; right = { type: 'pf' }; gesture = null; SFX.lock(); }
   } else if (g?.kind === 'pfAttach') {
     const p = Math.max(0, Math.min(1, (mouse.x - g.x0) / LOCK_PX));
     pf.rot = -Math.PI / 4 * (1 - p);
@@ -863,12 +891,6 @@ function update(dt, now) {
     } else if (p >= 1) {
       pf.where = 'group'; pf.rot = 0; gesture = null; SFX.lock(); pop('철컥!', GROUP);
     }
-  } else if (g?.kind === 'grind') {
-    g.t += dt;
-    pf.grind = Math.min(1, pf.grind + dt / GRIND_TIME);
-    if (Math.random() < 0.7) part(grainGeo, mat('#7a4e2c'), new V3(GX + (Math.random() - 0.5) * 0.02, TOP + 0.42, -0.28), new V3(0, -0.3, 0), { life: 0.4, spin: 0 });
-    if (Math.floor(g.t * 10) !== Math.floor((g.t - dt) * 10)) SFX.grind();
-    if (pf.grind >= 1) { gesture = null; pop('원두 OK', FORK); SFX.click(); }
   } else if (g?.kind === 'knock') {
     const dy = mouse.y - g.y0;
     if (g.anim < 0) {
@@ -883,15 +905,18 @@ function update(dt, now) {
           g.hit = true; SFX.thud();
           if (pf.state === 'puck' || pf.state === 'tamped' || (pf.state === 'clean' && pf.grind > 0)) {
             part(puckGeo, mat('#3a2414'), new V3(KNOCK.x, KNOCK.y - 0.13, KNOCK.z), new V3(0, -0.8, 0), { life: 0.3, spin: 3 });
-            pf.state = 'dirty'; pf.grind = 0; pop('탁!', KNOCK);
+            pf.state = 'dirty'; pf.grind = 0; pf.brush = 0; pop('탁!', KNOCK);
           } else pop('톡', KNOCK);
         }
         const k = Math.min(1, (t - 0.16) / 0.26);
         pf.flip = Math.PI * (1 + k); pf.knockY = 0.1 * (1 - k);
       }
-      if (t >= 0.42) { pf.flip = 0; pf.knockY = 0; g.anim = -1; g.y0 = mouse.y; } // 다시 ↓ 드래그하면 또 털 수 있음
+      if (t >= 0.42) {
+        pf.flip = 0; pf.knockY = 0;
+        if (g.auto) gesture = null; else { g.anim = -1; g.y0 = mouse.y; } // 다시 ↓ 하면 또 털 수 있음
+      }
     }
-  } else if (g?.kind === 'brush') {
+  } else if (g?.kind === 'brushUse') {
     const b = pfPos(), tip = brushG.position;
     if (Math.hypot(tip.x - b.x, tip.z - b.z) < 0.12) g.touched = true;
     const dx = mouse.x - g.lastX;
@@ -899,13 +924,27 @@ function update(dt, now) {
       const dir = Math.sign(dx);
       if (dir !== g.dir) {
         if (g.dir !== 0 && Math.abs(g.lastX - g.anchor) > 22 && g.touched) {
-          g.strokes++; SFX.brush();
+          pf.brush = (pf.brush || 0) + 1; SFX.brush();
           for (let i = 0; i < 3; i++) part(grainGeo, mat('#8a7864'), b.clone().add(new V3(0, 0.03, 0)), new V3((Math.random() - 0.5) * 0.8, 0.5, (Math.random() - 0.5) * 0.4), { life: 1.5, spin: 0 });
-          if (g.strokes >= 6 && pf.state === 'dirty') { pf.state = 'clean'; pf.grind = 0; pop('깨끗!', b); SFX.ding(); }
+          if (pf.brush >= 6 && pf.state === 'dirty') {
+            pf.state = 'clean'; pf.grind = 0; pop('깨끗!', b); SFX.ding();
+            pf.where = 'right'; leftHold = null; right = { type: 'pf' }; gesture = null; // 붓은 제자리, 포터필터는 오른손
+          }
         }
         g.dir = dir; g.anchor = g.lastX; g.touched = false;
       }
       g.lastX = mouse.x;
+    }
+  }
+  // 분쇄: 거치 후 한 번이면 가득까지 자동 (포터필터를 빼면 멈춤)
+  if (grinding) {
+    if (pf.where !== 'fork') grinding = false;
+    else {
+      const before = pf.grind;
+      pf.grind = Math.min(1, pf.grind + dt / GRIND_TIME);
+      if (Math.random() < 0.7) part(grainGeo, mat('#7a4e2c'), new V3(GX + (Math.random() - 0.5) * 0.02, TOP + 0.42, -0.28), new V3(0, -0.3, 0), { life: 0.4, spin: 0 });
+      if (Math.floor(pf.grind * 14) !== Math.floor(before * 14)) SFX.grind();
+      if (pf.grind >= 1) { grinding = false; pop('원두 OK', FORK); SFX.click(); }
     }
   }
   // 물: 한 번 클릭하면 80%까지 자동 (컵을 치우면 멈춤)
@@ -932,13 +971,13 @@ function update(dt, now) {
   // --- 추출 ---
   if (brew) {
     brew.t += dt;
-    const c = cupAt('group');
-    setStream(shotStream, GROUP.x, GROUP.z, GROUP.y - 0.02, c ? cupTop(c) - 0.03 : TOP + 0.18);
+    const onTray = glass.where === 'tray';
+    setStream(shotStream, GROUP.x, GROUP.z, GROUP.y - 0.02, onTray ? SPOT.group.y + GLASS_H - 0.01 : TOP + 0.18);
     if (brew.t >= BREW_TIME) {
       brew = null; pf.state = 'puck'; shotStream.visible = false;
-      if (!c) sign('컵이 없어서 샷이 버려졌어요');
-      else if (c.lid) sign('뚜껑 때문에 샷이 흘러넘쳤어요');
-      else { c.shot = true; refreshCup(c); pop('샷 완료!', SPOT.group.clone().add(new V3(0, 0.2, 0))); SFX.ding(); }
+      if (!onTray) sign('샷잔이 없어서 샷이 버려졌어요');
+      else if (glass.full) sign('샷잔이 넘쳤어요! 먼저 컵에 옮겨요');
+      else { glass.full = true; pop('샷 완료!', SPOT.group.clone().add(new V3(0, 0.15, 0))); SFX.ding(); }
     }
   } else shotStream.visible = false;
   brewPress = Math.max(0, brewPress - dt);
@@ -948,14 +987,15 @@ function update(dt, now) {
   // --- 스쿱 ---
   if (scoop.active) {
     const c = leftHold?.type === 'cup' ? leftHold.cup : null;
+    const using = gesture?.kind === 'scoopUse';
     const pt = blockOut(onPlane(TOP + 0.2), 0.05, 0.05);
     const inBin = pt && scoopInBin(pt);
     if (pt) { scoop.pos.x = pt.x; scoop.pos.z = pt.z; }
-    scoop.pos.y += ((inBin ? TOP + 0.065 : TOP + 0.22) - scoop.pos.y) * Math.min(1, dt * 15);
+    scoop.pos.y += ((inBin && using ? TOP + 0.065 : TOP + 0.22) - scoop.pos.y) * Math.min(1, dt * 15);
     const mx = scoop.pos.x - scoop.prev.x, mz = scoop.pos.z - scoop.prev.z, moved = Math.hypot(mx, mz);
     scoop.speed += (moved / Math.max(dt, 0.001) - scoop.speed) * Math.min(1, dt * 12);
     // 아이스빈 안에서 드래그 → 움직인 방향으로 스쿱 입구를 돌리며 얼음을 퍼 담음
-    if (inBin && moved > 0.002) {
+    if (inBin && using && moved > 0.002) {
       scoop.yaw += (Math.atan2(-mx, -mz) - scoop.yaw) * Math.min(1, dt * 12);
       if (scoop.cubes < SCOOP_CUBES) {
         scoop.fill += moved / 0.01;
@@ -963,7 +1003,7 @@ function update(dt, now) {
       }
     } else if (!inBin) scoop.yaw += (Math.PI / 2 - scoop.yaw) * Math.min(1, dt * 8); // 입구가 왼쪽 컵을 향함
     const dCup = c ? Math.hypot(scoop.pos.x - c.pos.x, scoop.pos.z - c.pos.z) : 9;
-    const overCup = c && !inBin && dCup < 0.11;
+    const overCup = c && !inBin && dCup < 0.11 && using;
     scoop.near = !!c && !inBin && dCup < 0.22 && scoop.cubes > 0;
     scoop.tilt += ((overCup && scoop.cubes > 0 ? 1.3 : 0) - scoop.tilt) * Math.min(1, dt * 10);
     scoop.pourT -= dt;
@@ -973,7 +1013,7 @@ function update(dt, now) {
       scoop.cubes--; scoop.pourT = 0.04;
       if (c.lid || c.ice >= CUP_ICE_MAX || (scoop.speed > 0.8 && Math.random() < 0.5))
         spillIce(scoop.pos.clone(), vel.multiplyScalar(0.5).add(new V3((Math.random() - 0.5) * 1.2, 0.4, (Math.random() - 0.5) * 0.8)));
-      else { c.ice++; refreshCup(c); SFX.ice(); }
+      else { c.ice++; refreshCup(c); SFX.ice(); if (c.ice === CUP_ICE_MAX) pop('얼음 가득!', c.pos.clone().add(new V3(0, 0.22, 0))); }
     } else if (!inBin && scoop.cubes > 0 && scoop.speed > 2.2 && scoop.pourT <= 0) {
       scoop.cubes--; scoop.pourT = 0.05;
       spillIce(scoop.pos.clone(), vel.multiplyScalar(0.7).add(new V3((Math.random() - 0.5), 0.6, (Math.random() - 0.5) * 0.5)));
@@ -989,10 +1029,9 @@ function update(dt, now) {
   // --- 오른손 목표 위치 ---
   const fingers = rHand.userData.fingers;
   let grip = false, rYaw = 0.25;
-  if (gesture?.kind === 'pfRemove' || gesture?.kind === 'pfAttach') {
+  if (gesture?.kind === 'pfRemove' || gesture?.kind === 'pfAttach' || gesture?.kind === 'autoLock') {
     rTarget.copy(handleEnd()); grip = true; rYaw = pf.rot;
-  } else if (gesture?.kind === 'grind') { rTarget.set(GX + 0.04, TOP + 0.47, -0.22); }
-  else if (gesture?.kind === 'brush') {
+  } else if (right?.type === 'brush') {
     const b = pfPos(); const p = blockOut(onPlane(b.y + 0.03), 0.03, 0.03);
     if (p) brushG.position.copy(p);
     rTarget.copy(brushG.position).add(new V3(0, 0.03, 0.1)); grip = true;
@@ -1013,9 +1052,10 @@ function update(dt, now) {
     const p = onPlane(TOP + 0.1); if (p) rTarget.copy(p).add(new V3(0, 0, 0.06));
   }
   if (!tamp) tamperG.position.lerp(TAMPER_HOME, Math.min(1, dt * 12));
-  if (gesture?.kind !== 'brush') brushG.position.lerp(BRUSH_HOME, Math.min(1, dt * 12));
+  if (right?.type !== 'brush') brushG.position.lerp(BRUSH_HOME, Math.min(1, dt * 12));
+  setAlpha(rHandMats, right || gesture || tamp ? 0.45 : 1);
   // 손가락이 기기 안으로 들어가지 않게 (포터필터 결합/분리 중엔 핸들을 쥐어야 하므로 제외)
-  if (!(gesture?.kind === 'pfRemove' || gesture?.kind === 'pfAttach' || gesture?.kind === 'knock'))
+  if (!(gesture?.kind === 'pfRemove' || gesture?.kind === 'pfAttach' || gesture?.kind === 'autoLock' || gesture?.kind === 'knock'))
     blockOut(rTarget.add(new V3(0, 0, -0.06)), 0.07, 0.05).add(new V3(0, 0, 0.06));
   rHand.position.lerp(rTarget, Math.min(1, dt * 20));
   rHand.rotation.y += (rYaw - rHand.rotation.y) * Math.min(1, dt * 15);
@@ -1024,11 +1064,36 @@ function update(dt, now) {
   // --- 포터필터 위치 ---
   if (pf.shake > 0) pf.shake -= dt;
   const shake = pf.shake > 0 ? Math.sin(now * 60) * 0.01 : 0;
+  if (pf.where === 'right' && right?.type === 'pf' && !gesture) {
+    const b = pfBasketTarget();
+    const touching = Math.abs(b.x) < 0.48 && b.z <= GROUP.z + 0.003;
+    if (touching && !pf.wallHit && Math.abs(b.x - GROUP.x) < ATTACH_TOL_X) { // 뒤로 뺐다가 다시 밀어 넣어야 결합
+      pf.where = 'seat'; pf.rot = -Math.PI / 4; right = null; SFX.click();
+      gesture = { kind: 'autoLock', t: 0 };
+    } else if (touching && Math.abs(b.x - GROUP.x) < 0.15) {
+      if (!pf.wallHit) { pf.wallHit = true; SFX.clank(); pf.shake = 0.3; sign('안 맞아요! 그룹헤드 정확히 아래로'); }
+    } else if (!touching) pf.wallHit = false;
+  }
+  if (gesture?.kind === 'autoLock') {
+    gesture.t += dt;
+    pf.rot = -Math.PI / 4 * (1 - Math.min(1, gesture.t / 0.25));
+    if (gesture.t >= 0.25) { pf.where = 'group'; pf.rot = 0; gesture = null; SFX.lock(); pop('철컥!', GROUP); }
+  }
+  if (pf.where === 'right' && right?.type === 'pf' && !gesture) {
+    const ks = KNOCK.clone().project(camera);
+    const kx = (ks.x + 1) / 2 * innerWidth, ky = (1 - ks.y) / 2 * innerHeight;
+    pf.magnet = Math.hypot(mouse.x - kx, mouse.y - ky) < 80;
+    if (pf.magnet) {
+      if (pf.magY0 === null || mouse.y < pf.magY0) pf.magY0 = mouse.y;
+      if (mouse.y - pf.magY0 > 35) { gesture = { kind: 'knock', anim: 0, hit: false, y0: mouse.y, auto: true }; pf.magY0 = null; }
+    } else pf.magY0 = null;
+  } else pf.magnet = false;
+  setAlpha(pfMats, pf.where === 'right' ? 0.6 : 1);
   if (pf.where === 'right') {
-    if (gesture?.kind === 'knock') pfG.position.set(KNOCK.x, KNOCK.y - pf.knockY, KNOCK.z);
+    if (gesture?.kind === 'knock' || pf.magnet) pfG.position.set(KNOCK.x, KNOCK.y - pf.knockY, KNOCK.z);
     else pfG.position.copy(pfBasketTarget()).add(new V3(shake, 0, 0));
     pfG.rotation.set(0, 0, gesture?.kind === 'knock' ? pf.flip || 0 : 0);
-    if (gesture?.kind === 'knock') rHand.position.copy(pfG.position).add(new V3(0.01, -0.01, 0.2));
+    if (gesture?.kind === 'knock' || pf.magnet) rHand.position.copy(pfG.position).add(new V3(0.01, -0.01, 0.2));
   } else {
     pfG.position.copy(pfPos()); pfG.rotation.set(0, pf.rot, 0);
   }
@@ -1051,6 +1116,27 @@ function update(dt, now) {
   else if (leftHold?.type === 'pf') { lT = LEFT_PF.clone().add(new V3(0, -0.01, 0.2)); lGrip = true; }
   lHand.position.lerp(lT, Math.min(1, dt * 15));
   lHand.userData.fingers.forEach(f => f.rotation.x += ((lGrip ? -1.1 : -0.2) - f.rotation.x) * Math.min(1, dt * 15));
+
+  // --- 샷잔 ---
+  if (glass.pour) {
+    const P = glass.pour; P.t += dt;
+    const c = P.cup;
+    const above = c.pos.clone().add(new V3(0.05, 0.17, 0));
+    glass.pos.lerp(above, Math.min(1, dt * 18));
+    glass.g.rotation.z += ((P.t > 0.15 ? 1.9 : 0) - glass.g.rotation.z) * Math.min(1, dt * 14);
+    if (P.t > 0.25) setStream(shotStream, c.pos.x + 0.01, c.pos.z, above.y, c.pos.y + 0.004 + liquidLevel(c) * 0.12);
+    if (P.t > 0.6) {
+      c.shot = true; refreshCup(c); glass.full = false; glass.pour = null;
+      glass.where = 'tray'; right = null; shotStream.visible = false; SFX.ding(); pop('샷 OK', c.pos.clone().add(new V3(0, 0.22, 0)));
+    }
+  } else {
+    if (glass.where === 'right') { const p = blockOut(onPlane(TOP + 0.1), 0.04, GLASS_H); if (p) glass.pos.copy(p); }
+    else glass.pos.lerp(SPOT.group, Math.min(1, dt * 15));
+    glass.g.rotation.z *= 0.7;
+  }
+  glass.g.position.copy(glass.pos);
+  glass.fill.visible = glass.full;
+  if (glass.where === 'right' || glass.pour) rHand.position.lerp(glass.pos.clone().add(new V3(0.045, 0.03, 0.05)), Math.min(1, dt * 20));
 
   // --- 컵 ---
   for (const c of cups) {
@@ -1134,7 +1220,7 @@ function hud() {
     const rows = laps.map((l, i) => `<div class="${i === laps.length - 1 ? 'last' : ''}">${i + 1}잔 · ${l.toFixed(1)}초</div>`).slice(-8);
     $('laps').innerHTML = rows.join('') + (phase === 'play' ? `<div>지금 ${(elapsed - lapStart).toFixed(1)}초</div>` : '');
   }
-  const c = right?.type === 'cup' ? right.cup : leftHold?.type === 'cup' ? leftHold.cup : cupAt('group') || cupAt('water');
+  const c = right?.type === 'cup' ? right.cup : leftHold?.type === 'cup' ? leftHold.cup : cupAt('c0') || cupAt('water');
   const on = c ? [c.water >= WATER_TARGET - 0.001, c.ice >= CUP_ICE_MAX, c.shot, c.lid, c.sleeve] : [0, 0, 0, 0, 0];
   [...$('check').children].forEach((s, i) => s.classList.toggle('on', !!on[i]));
 }
