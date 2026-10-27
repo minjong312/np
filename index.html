@@ -2,11 +2,44 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<script>
+  // 맥 없이 아이폰에서 오류 보기: 화면 왼쪽 위에 빨간 상자로 표시
+  addEventListener('error', e => { const b = document.getElementById('err'); if (b) { b.style.display = 'block'; b.textContent += (e.message || e) + ' @' + (e.lineno || '') + '\n'; } });
+  addEventListener('unhandledrejection', e => { const b = document.getElementById('err'); if (b) { b.style.display = 'block'; b.textContent += 'promise: ' + e.reason + '\n'; } });
+  if (matchMedia('(pointer: coarse)').matches) document.documentElement.classList.add('touch');
+</script>
 <title>[아아 장인]</title>
 <style>
   html, body { margin: 0; height: 100%; overflow: hidden; background: #1a1714; font-family: "Malgun Gothic", "Apple SD Gothic Neo", sans-serif; user-select: none; }
-  canvas { display: block; cursor: crosshair; }
+  canvas { display: block; cursor: crosshair; touch-action: none; }
+  body { -webkit-touch-callout: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent; }
+  #drop {
+    position: fixed; right: 20px; bottom: 86px; display: none; font: bold 18px "Malgun Gothic", sans-serif; padding: 10px 18px;
+    border: 4px solid #111; border-radius: 14px; background: #fff; box-shadow: 0 5px 0 #111;
+  }
+  .touch #drop.on { display: block; }
+  #rotate { position: fixed; inset: 0; z-index: 10; display: none; background: #1a1714; color: #ffe27a; font-size: 26px; font-weight: bold;
+    align-items: center; justify-content: center; text-align: center; }
+  @media (orientation: portrait) { .touch #rotate { display: flex; } }
+  #err { position: fixed; left: 0; top: 0; z-index: 20; display: none; max-width: 100%; background: #b00; color: #fff; font: 12px monospace; padding: 6px; white-space: pre-wrap; }
+  .touchOnly { display: none; } .touch .touchOnly { display: inline; } .touch .pcOnly { display: none; }
+  /* 폰 가로 화면 (높이 작음) */
+  @media (max-height: 500px) {
+    #count { font-size: 20px; top: 8px; left: 12px; } #timer { font-size: 30px; top: 4px; } #best { font-size: 15px; top: 10px; right: 12px; }
+    #check { bottom: 8px; left: 8px; gap: 3px; } #check span { font-size: 11px; padding: 3px 5px; border-width: 2px; }
+    #hint { display: none; }
+    #done { right: 12px; bottom: 10px; font-size: 18px; padding: 10px 18px; }
+    #drop { right: 12px; bottom: 66px; font-size: 15px; padding: 8px 14px; }
+    #quit { right: 12px; top: 34px; }
+    #laps { top: 70px; right: 12px; font-size: 12px; }
+    #sign { top: 50px; font-size: 16px; padding: 6px 14px; }
+    .ov { gap: 8px; } .ov h1 { font-size: 34px; } .ov h2 { font-size: 26px; } .ov .big { font-size: 46px; }
+    .ov p { font-size: 11px; line-height: 1.5; } .ov button { font-size: 18px; padding: 8px 20px; }
+  }
   .hud { position: fixed; pointer-events: none; color: #fff; font-weight: bold; text-shadow: 0 3px 0 #000, 0 0 2px #000; }
   #count { top: 14px; left: 18px; font-size: 30px; }
   #timer { top: 8px; left: 50%; transform: translateX(-50%); font: bold 48px monospace; }
@@ -68,8 +101,11 @@
 <div class="hud" id="check"><span>💧 물 80%</span><span>🧊 얼음 가득</span><span>☕ 샷</span><span>⚪ 뚜껑</span><span>🟫 홀더</span></div>
 <div class="hud" id="hint"></div>
 <div class="hud" id="laps"></div>
-<button id="done">완성! (Space)</button>
-<button id="quit">그만하기 (Esc)</button>
+<button id="done">완성!<span class="pcOnly"> (Space)</span></button>
+<button id="drop">✋ 내려놓기</button>
+<button id="quit">그만하기<span class="pcOnly"> (Esc)</span></button>
+<div id="rotate">📱↻<br>가로로 돌려 주세요</div>
+<div id="err"></div>
 <div id="sign"></div>
 <div id="fx"></div>
 <div class="ov" id="ovStart">
@@ -79,7 +115,8 @@
     스쿱 클릭 → 왼손 컵 · 오른손 스쿱 → 아이스빈에서 누르고 드래그로 푸기 → 컵 위에서 누르고 <b>천천히</b> (급하면 흘림)<br>
     포터필터: 핸들 잡고 <b>←</b> 드래그로 빼기 → 드로어 위에서 <b>↓</b> 털기 → 붓 클릭 후 <b>지그재그</b> → 분쇄기에 거치(자동 분쇄)<br>
     → 탬퍼 클릭 → 그룹헤드 <b>정확히 아래</b>로 화면 안쪽으로 밀어 넣기(자동 결합) → 초록 버튼으로 추출 → 샷잔 집어 컵 클릭<br>
-    컵 들고 머신 위 뚜껑 · 홀더 클릭 → 완성! · 우클릭 = 내려놓기 · 컵 들고 휙 던지면 싱크대 골인</p>
+    컵 들고 머신 위 뚜껑 · 홀더 클릭 → 완성! · <span class="pcOnly">우클릭</span><span class="touchOnly">✋ 버튼</span> = 내려놓기 · 컵 들고 휙 던지면 싱크대 골인</p>
+  <p class="touchOnly">클릭 = 탭 · 아이폰: 공유 → <b>홈 화면에 추가</b>하면 전체 화면</p>
   <p id="startBest"></p>
   <div class="modes">
     <button id="startTimed">⏱ 1분 모드<small>60초 동안 몇 잔?</small></button>
@@ -119,8 +156,13 @@ const SCOOP_X = 1.79;
 const SCOOP_HOME = new V3(SCOOP_X, TOP + 0.11, -0.3);
 const TAP = new V3(WX, TOP + 0.29, -0.21);
 const BREW_BTN = new V3(-0.17, TOP + 0.49, -0.2);
-const ATTACH_TOL_X = 0.022, ATTACH_TOL_Z = 0.03, ATTACH_NEAR = 0.12;
+const ATTACH_TOL_X = matchMedia('(pointer: coarse)').matches ? 0.03 : 0.022, ATTACH_TOL_Z = 0.03, ATTACH_NEAR = 0.12;
 const LOCK_PX = 130, SLIP_PX = 60;
+// 터치 기기 여부 · 화면 픽셀 기준값 배율 (PC 900px 높이 = 1, 폰 가로 ≈ 0.45)
+const TOUCH = matchMedia('(pointer: coarse)').matches;
+let UI = 1;
+const px = n => n * UI;
+const MAGNET_PX = TOUCH ? 110 : 80;
 const BREW_TIME = 3, WATER_RATE = 0.55, WATER_TARGET = 0.8, GRIND_TIME = 1.4;
 const CUP_ICE_MAX = 15, SCOOP_CUBES = CUP_ICE_MAX; // 스쿱 한 번 = 컵 가득
 // 손·들고 있는 물건이 못 들어가는 영역 [minX, maxX, minZ, maxZ, botY, topY, 앞으로만 밀기]
@@ -141,7 +183,7 @@ const COL = {
 // ===== 렌더러 / 카메라 =====
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(Math.min(2, devicePixelRatio));
-renderer.shadowMap.enabled = true;
+renderer.shadowMap.enabled = !TOUCH; // 모바일은 그림자 끔 (성능)
 document.body.prepend(renderer.domElement);
 const cv = renderer.domElement;
 const camera = new THREE.PerspectiveCamera(52, 1, 0.05, 50);
@@ -587,7 +629,10 @@ function pick() {
   return null;
 }
 
-addEventListener('mousemove', e => {
+// 마우스·터치 공통 (Pointer Events). 터치는 첫 손가락만 씀
+let activePointer = null;
+addEventListener('pointermove', e => {
+  if (e.pointerType !== 'mouse' && e.pointerId !== activePointer) return;
   mouse.x = e.clientX; mouse.y = e.clientY; updNdc();
   const now = performance.now();
   samples.push({ t: now, x: mouse.x, y: mouse.y });
@@ -595,17 +640,27 @@ addEventListener('mousemove', e => {
   if (!gesture && phase === 'play') updateHint();
 });
 cv.addEventListener('contextmenu', e => e.preventDefault());
-cv.addEventListener('mousedown', e => {
+cv.addEventListener('pointerdown', e => {
   if (phase !== 'play') return;
+  if (e.pointerType !== 'mouse' && activePointer !== null) return; // 두 번째 손가락 무시
   mouse.x = e.clientX; mouse.y = e.clientY; updNdc();
   if (e.button === 2) { if (!gesture && !tamp) dropRight(); return; }
   if (e.button !== 0 || gesture || tamp || glass.pour) return;
+  activePointer = e.pointerId;
   mouse.down = true;
   samples = [{ t: performance.now(), x: mouse.x, y: mouse.y }];
   onDown();
 });
-addEventListener('mouseup', e => { if (e.button === 0 && mouse.down) { mouse.down = false; onUp(); } });
-addEventListener('blur', () => { if (mouse.down) { mouse.down = false; onUp(); } });
+const pointerEnd = e => {
+  if (e.pointerId !== activePointer) return;
+  activePointer = null;
+  if (mouse.down) { mouse.down = false; onUp(); }
+};
+addEventListener('pointerup', pointerEnd);
+addEventListener('pointercancel', pointerEnd);
+addEventListener('blur', () => { activePointer = null; if (mouse.down) { mouse.down = false; onUp(); } });
+$('drop').addEventListener('click', e => { if (phase === 'play' && !gesture && !tamp) dropRight(); e.currentTarget.blur(); });
+document.addEventListener('gesturestart', e => e.preventDefault()); // iOS 핀치 확대 막기
 addEventListener('keydown', e => { if (e.code === 'Space') { e.preventDefault(); complete(); } });
 $('done').addEventListener('click', e => { complete(); e.currentTarget.blur(); });
 
@@ -777,7 +832,7 @@ function flickVelocity() {
   const rec = samples.filter(s => now - s.t < 100);
   if (rec.length < 2 || now - rec[rec.length - 1].t > 50) return { vx: 0, vy: 0 };
   const a = rec[0], b = rec[rec.length - 1], dt = (b.t - a.t) / 1000;
-  return dt > 0.01 ? { vx: (b.x - a.x) / dt, vy: (b.y - a.y) / dt } : { vx: 0, vy: 0 };
+  return dt > 0.01 ? { vx: (b.x - a.x) / dt / UI, vy: (b.y - a.y) / dt / UI } : { vx: 0, vy: 0 };
 }
 
 function cupClick(hit) {
@@ -870,7 +925,7 @@ function updateHint() {
   else s = { cupStack: '클릭: 새 컵', pf: pf.where === 'group' ? '누르고 ← 드래그: 포터필터 빼기' : '클릭: 포터필터 집기', water: '클릭: 물 80%까지 자동',
     grinder: '클릭: 분쇄 (자동)', brew: '클릭: 추출', scoop: '클릭: 스쿱 잡기 (왼손에 컵 자동)', iceBin: '스쿱통의 스쿱을 잡으세요', brush: '클릭: 붓 잡기 (포터필터 자동)', tamper: '클릭: 탬핑 (포터필터 자동)',
     cup: '클릭: 컵 집기', glass: glass.full ? '클릭: 샷잔 집기' : '샷잔 (추출하면 여기에 담겨요)', lid: '컵을 들고 클릭', sleeve: '컵을 들고 클릭' }[t] || '';
-  $('hint').textContent = s;
+  $('hint').textContent = TOUCH ? s.replace(/클릭/g, '탭') : s;
 }
 
 // ===== 업데이트 =====
@@ -889,13 +944,13 @@ function update(dt, now) {
   // --- 제스처 진행 ---
   const g = gesture;
   if (g?.kind === 'pfRemove') {
-    const p = Math.max(0, Math.min(1, (g.x0 - mouse.x) / LOCK_PX));
+    const p = Math.max(0, Math.min(1, (g.x0 - mouse.x) / px(LOCK_PX)));
     pf.rot = -Math.PI / 4 * p;
     if (p >= 1) { pf.where = 'right'; pf.rot = 0; pf.wallHit = true; right = { type: 'pf' }; gesture = null; SFX.lock(); }
   } else if (g?.kind === 'pfAttach') {
-    const p = Math.max(0, Math.min(1, (mouse.x - g.x0) / LOCK_PX));
+    const p = Math.max(0, Math.min(1, (mouse.x - g.x0) / px(LOCK_PX)));
     pf.rot = -Math.PI / 4 * (1 - p);
-    if (Math.abs(mouse.y - g.y0) > SLIP_PX) {
+    if (Math.abs(mouse.y - g.y0) > px(SLIP_PX)) {
       pf.where = 'right'; pf.rot = 0; right = { type: 'pf' }; gesture = null; SFX.clank(); sign('미끄러졌어요! 수평으로 →');
     } else if (p >= 1) {
       pf.where = 'group'; pf.rot = 0; gesture = null; SFX.lock(); pop('철컥!', GROUP);
@@ -904,7 +959,7 @@ function update(dt, now) {
     const dy = mouse.y - g.y0;
     if (g.anim < 0) {
       pf.knockY = Math.max(0, Math.min(0.05, dy * 0.001));
-      if (dy > 40) { g.anim = 0; g.hit = false; }
+      if (dy > px(40)) { g.anim = 0; g.hit = false; }
     } else {
       g.anim += dt;
       const t = g.anim;
@@ -929,10 +984,10 @@ function update(dt, now) {
     const b = pfPos(), tip = brushG.position;
     if (Math.hypot(tip.x - b.x, tip.z - b.z) < 0.12) g.touched = true;
     const dx = mouse.x - g.lastX;
-    if (Math.abs(dx) > 2) {
+    if (Math.abs(dx) > px(2)) {
       const dir = Math.sign(dx);
       if (dir !== g.dir) {
-        if (g.dir !== 0 && Math.abs(g.lastX - g.anchor) > 22 && g.touched) {
+        if (g.dir !== 0 && Math.abs(g.lastX - g.anchor) > px(22) && g.touched) {
           pf.brush = (pf.brush || 0) + 1; SFX.brush();
           for (let i = 0; i < 3; i++) part(grainGeo, mat('#8a7864'), b.clone().add(new V3(0, 0.03, 0)), new V3((Math.random() - 0.5) * 0.8, 0.5, (Math.random() - 0.5) * 0.4), { life: 1.5, spin: 0 });
           if (pf.brush >= 6 && pf.state === 'dirty') {
@@ -1091,10 +1146,10 @@ function update(dt, now) {
   if (pf.where === 'right' && right?.type === 'pf' && !gesture) {
     const ks = KNOCK.clone().project(camera);
     const kx = (ks.x + 1) / 2 * innerWidth, ky = (1 - ks.y) / 2 * innerHeight;
-    pf.magnet = Math.hypot(mouse.x - kx, mouse.y - ky) < 80;
+    pf.magnet = Math.hypot(mouse.x - kx, mouse.y - ky) < px(MAGNET_PX);
     if (pf.magnet) {
       if (pf.magY0 === null || mouse.y < pf.magY0) pf.magY0 = mouse.y;
-      if (mouse.y - pf.magY0 > 35) { gesture = { kind: 'knock', anim: 0, hit: false, y0: mouse.y, auto: true }; pf.magY0 = null; }
+      if (mouse.y - pf.magY0 > px(35)) { gesture = { kind: 'knock', anim: 0, hit: false, y0: mouse.y, auto: true }; pf.magY0 = null; }
     } else pf.magY0 = null;
   } else pf.magnet = false;
   setAlpha(pfMats, pf.where === 'right' ? 0.6 : 1);
@@ -1216,6 +1271,7 @@ function flyCup(c, dt) {
 // ===== HUD =====
 const fmtT = t => Math.floor(t / 60) + ':' + (t % 60).toFixed(1).padStart(4, '0');
 function hud() {
+  $('drop').classList.toggle('on', !!right && phase === 'play');
   $('count').textContent = '☕ ' + count + '잔' + (goals ? `  🗑 골인 ${goals}` : '');
   if (mode === 'timed') {
     $('timer').textContent = timeLeft.toFixed(1);
@@ -1283,7 +1339,7 @@ $('quit').onclick = e => { endGame(); e.currentTarget.blur(); };
 addEventListener('keydown', e => { if (e.code === 'Escape' && phase === 'play' && mode === 'practice') endGame(); });
 showMenu();
 
-function resize() { renderer.setSize(innerWidth, innerHeight); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); }
+function resize() { UI = Math.min(1, innerHeight / 900); renderer.setSize(innerWidth, innerHeight); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); }
 addEventListener('resize', resize); resize(); updNdc();
 
 let last = performance.now();
