@@ -44,6 +44,12 @@
   .touch #drop.on { display: block; }
   #quit { top: 10px; display: none; font-size: 12px; padding: 4px 11px; background: transparent; color: #fff; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.55); }
   #done:active, #drop:active { transform: scale(0.96); }
+  /* 터치: 오른쪽 아래 엄지 버튼. 모서리·아래쪽 목표는 12mm 이상(Hoober), 엄지 접촉 폭 약 25mm(MIT Touch Lab)
+     아이폰 가로 CSS 1px ≈ 0.166mm(약 6px/mm) → 완성 150×72px(25×12mm), 내려놓기 높이 54px(9mm) */
+  .touch #done { min-width: 150px; height: 72px; padding: 0 24px; font-size: 18px;
+    right: max(10px, env(safe-area-inset-right)); bottom: max(10px, env(safe-area-inset-bottom)); }
+  .touch #drop { height: 54px; min-width: 110px; padding: 0 18px; font-size: 15px;
+    right: max(10px, env(safe-area-inset-right)); bottom: calc(max(10px, env(safe-area-inset-bottom)) + 82px); }
 
   /* 시작·끝 화면 */
   .ov { position: fixed; inset: 0; background: rgba(20, 16, 12, 0.74); display: flex; flex-direction: column; align-items: center;
