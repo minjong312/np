@@ -651,7 +651,7 @@ function spillIce(pos, vel) { part(cubeGeo, cubeMat, pos, vel, { shadow: true, l
 
 // ===== 게임 상태 =====
 let phase = 'ready', mode = 'timed', timeLeft = GAME_TIME, elapsed = 0, count = 0, best = 0, bestLap = 0;
-let laps = [], lapStart = 0, waterFill = null, grinding = false;
+let laps = [], lapStart = 0, waterFill = null, grinding = false, started = false; // started: 첫 터치 뒤 true
 let best3 = 0; // 3잔 모드 최단 시간(초)
 try { best = parseInt(localStorage.getItem(BEST_KEY)) || 0; bestLap = parseFloat(localStorage.getItem(LAP_KEY)) || 0; best3 = parseFloat(localStorage.getItem(BEST3_KEY)) || 0; } catch (e) {}
 let right = null;      // null | {type:'cup', cup} | {type:'pf', pf} | {type:'pfGrip', p, pf} | {type:'glass', gl} | {type:'scoop'}
@@ -720,6 +720,7 @@ cv.addEventListener('pointerdown', e => {
   if (phase !== 'play') return;
   if (e.pointerType !== 'mouse' && activePointer !== null) return; // 두 번째 손가락 무시
   mouse.x = e.clientX; mouse.y = e.clientY; updNdc();
+  started = true; // 첫 터치(클릭)부터 시간 측정
   if (e.button === 2) { if (!gesture && !tamp) dropRight(); return; }
   if (e.button !== 0 || gesture || tamp || pouring() || scoop.dip || scoop.pour) return;
   activePointer = e.pointerId;
@@ -1127,7 +1128,7 @@ const tmp = new V3();
 let rTarget = new V3(0.5, TOP + 0.1, 0.1);
 
 function update(dt, now) {
-  if (phase === 'play') {
+  if (phase === 'play' && started) { // 시계는 첫 터치부터
     elapsed += dt;
     if (mode === 'timed') {
       timeLeft -= dt;
@@ -1475,7 +1476,7 @@ function hud() {
   const t = mode === 'timed' ? `<span class="${timeLeft < 10 ? 'hurry' : ''}">${Math.ceil(timeLeft)}초</span>` : fmtT(elapsed);
   const bst = mode === 'timed' ? (best ? '최고 ' + best + '잔' : '') : mode === 'three' ? (best3 ? '최고 ' + fmtT(best3) : '')
     : (laps.length ? '마지막 ' + laps[laps.length - 1].toFixed(1) + '초' : bestLap ? '최고 ' + bestLap.toFixed(1) + '초' : '');
-  $('count').innerHTML = (mode === 'three' ? `${count}/${GOAL_CUPS}잔` : `${count}잔`) + `<span class="dim">${t}</span>` + (bst ? `<span class="dim">${bst}</span>` : '');
+  $('count').innerHTML = (mode === 'three' ? `${count}/${GOAL_CUPS}잔` : `${count}잔`) + `<span class="dim">${t}</span>` + (bst ? `<span class="dim">${bst}</span>` : '') + (started ? '' : '<span class="dim">터치하면 시작</span>');
   // 기기 위 남은 초: 숫자만 (탄 원두·식은 샷은 연기·색으로)
   GROUPS.forEach((G, gi) => {
     const brew = brews[gi];
@@ -1489,7 +1490,7 @@ function hud() {
 function startGame(m = mode) {
   if (!AC) { try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} }
   AC?.resume?.();
-  mode = m; resetGame(); phase = 'play';
+  mode = m; resetGame(); phase = 'play'; started = false;
   $('quit').style.display = mode !== 'timed' ? 'block' : 'none';
   $('ovStart').classList.add('hidden'); $('ovHelp').classList.add('hidden'); $('ovEnd').classList.add('hidden');
 }
