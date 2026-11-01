@@ -26,88 +26,126 @@
     addEventListener('load', reset); addEventListener('pageshow', reset); addEventListener('orientationchange', () => setTimeout(reset, 300));
     if (window.visualViewport) visualViewport.addEventListener('resize', () => { if (Math.abs(visualViewport.scale - 1) > 0.01) reset(); });
   })();
+  // 불러오기 실패(인터넷 끊김 등): 12초 안에 게임이 준비 안 되면 시작 화면에 안내
+  setTimeout(() => { if (window.__game) return; const st = document.getElementById('loadStatus');
+    if (st) { st.textContent = '게임을 불러오지 못했어요. 인터넷 연결을 확인하고 새로고침해 주세요'; st.classList.add('error'); } }, 12000);
 </script>
 <title>[아아 장인]</title>
 <style>
-  html, body { margin: 0; height: 100%; overflow: hidden; background: #1a1714; user-select: none;
-    font-family: -apple-system, "Apple SD Gothic Neo", "Pretendard", "Malgun Gothic", sans-serif; }
+  /* ===== 디자인 토큰 (docs/DESIGN.md) ===== */
+  :root {
+    /* 색 */
+    --c-bg: #1a1714;                       /* 앱 바탕 · 진한 에스프레소 */
+    --c-scrim: rgba(20, 16, 12, 0.74);     /* 시작·결과 화면 뒤 가림막 */
+    --c-scrim-strong: rgba(20, 16, 12, 0.86); /* 설명 창 (글이 많음) */
+    --c-surface: #ffffff;                  /* 카드 · 주 버튼 */
+    --c-surface-float: rgba(255, 255, 255, 0.92); /* 게임 위에 뜬 주 버튼 */
+    --c-surface-soft: rgba(255, 255, 255, 0.75);  /* 게임 위에 뜬 보조 버튼 */
+    --c-on-surface: #1a1714;               /* 흰 바탕 위 글자 */
+    --c-text: #ffffff;                     /* 어두운 바탕·게임 위 글자 */
+    --c-text-2: rgba(255, 255, 255, 0.75); /* 보조 글 */
+    --c-text-3: rgba(255, 255, 255, 0.55); /* 흐린 글 (시간·최고 기록) */
+    --c-line: rgba(255, 255, 255, 0.55);   /* 테두리 버튼 선 */
+    --c-accent: #ffd27a;                   /* 대표색 · LED 금색 (신기록) */
+    --c-warn: #ffd9a0;                     /* 주의 (경고 한 줄) */
+    --c-danger: #ff8a7a;                   /* 오류·급함 (남은 10초) */
+    --c-success: #4cd964;                  /* 완료·준비됨 (3D 추출 버튼) */
+    --c-error-box: #b00000;                /* 개발용 오류 상자 */
+    --shadow-text: 0 1px 2px rgba(0, 0, 0, 0.7); /* 게임 위 글자 그림자 */
+    /* 글자 (PC) */
+    --fs-display: 56px; --fs-title: 30px; --fs-heading: 18px; --fs-body: 15px; --fs-small: 13px; --fs-caption: 12px;
+    /* 간격 · 모서리 · 크기 */
+    --edge: 14px;                          /* 화면 가장자리 여백 */
+    --gap-s: 6px; --gap-m: 10px; --gap-l: 12px; --pad-card: 18px;
+    --r-pill: 999px; --r-card: 16px;
+    --hit-min: 44px;                       /* 버튼 최소 높이 (터치는 48px) */
+    --ring: 0 0 0 3px rgba(255, 210, 122, 0.85); /* 포커스 테두리 = 대표색 */
+  }
+  .touch { --hit-min: 48px; }
+  @media (max-height: 500px) { :root {
+    --fs-display: 36px; --fs-title: 22px; --fs-heading: 15px; --fs-body: 13px; --fs-small: 11px; --fs-caption: 10px;
+    --edge: 12px; --gap-s: 4px; --gap-m: 8px; --gap-l: 8px; --pad-card: 12px;
+  } }
+
+  /* ===== 바탕 ===== */
+  html, body { margin: 0; height: 100%; overflow: hidden; background: var(--c-bg); user-select: none;
+    font-family: -apple-system, "Apple SD Gothic Neo", "Pretendard", "Malgun Gothic", "Noto Sans KR", sans-serif; }
   html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; } /* iOS 가로 회전 시 글자 자동 확대 막기 */
   html, body { touch-action: none; } /* 핀치·두 번 탭 확대 막기 */
-  button { touch-action: manipulation; } .ov { touch-action: pan-y; } /* 버튼은 바로 눌림, 시작·설명 화면은 위아래 스크롤만 */
+  button { touch-action: manipulation; font-family: inherit; } .ov { touch-action: pan-y; } /* 버튼은 바로 눌림, 시작·설명 화면은 위아래 스크롤만 */
   canvas { display: block; cursor: crosshair; touch-action: none; }
   body { -webkit-touch-callout: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent; }
-  button { font-family: inherit; }
   .touchOnly { display: none; } .touch .touchOnly { display: inline; } .touch .pcOnly { display: none; }
-  #err { position: fixed; left: 0; top: 0; z-index: 20; display: none; max-width: 100%; background: #b00; color: #fff; font: 12px monospace; padding: 6px; white-space: pre-wrap; }
-  #rotate { position: fixed; inset: 0; z-index: 10; display: none; background: #1a1714; color: #fff; font-size: 15px; font-weight: 600;
+  #err { position: fixed; left: 0; top: 0; z-index: 20; display: none; max-width: 100%; background: var(--c-error-box); color: #fff; font: 12px monospace; padding: 6px; white-space: pre-wrap; }
+  #rotate { position: fixed; inset: 0; z-index: 10; display: none; background: var(--c-bg); color: var(--c-text); font-size: var(--fs-body); font-weight: 600;
     align-items: center; justify-content: center; }
   @media (orientation: portrait) { .touch #rotate { display: flex; } }
 
-  /* 왼쪽 위: 잔 수 · 시간 · 최고 한 줄, 그 아래 경고 한 줄 */
-  .hud, #sign, .tag { position: fixed; pointer-events: none; color: #fff; font-weight: 600; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7); font-variant-numeric: tabular-nums; }
-  #count { top: 12px; left: max(14px, env(safe-area-inset-left)); font-size: 15px; white-space: nowrap; }
-  #count .dim { opacity: 0.6; margin-left: 10px; }
-  #count .hurry { color: #ff8a7a; }
-  #sign { top: 34px; left: max(14px, env(safe-area-inset-left)); font-size: 13px; color: #ffd9a0; opacity: 0; transition: opacity 0.15s; white-space: nowrap; }
+  /* ===== 공통: 게임 위 글자 (HUD) ===== */
+  .hud, #sign, .tag { position: fixed; pointer-events: none; color: var(--c-text); font-weight: 600; text-shadow: var(--shadow-text); font-variant-numeric: tabular-nums; }
+  #count { top: var(--edge); left: max(var(--edge), env(safe-area-inset-left)); font-size: var(--fs-body); white-space: nowrap; }
+  #count .dim { color: var(--c-text-3); margin-left: var(--gap-m); }
+  #count .hurry { color: var(--c-danger); }
+  #sign { top: calc(var(--edge) + var(--fs-body) + 8px); left: max(var(--edge), env(safe-area-inset-left)); font-size: var(--fs-small); color: var(--c-warn);
+    opacity: 0; transition: opacity 0.15s; white-space: nowrap; }
   #sign.show { opacity: 1; }
-  #sign.info { color: #e8e2d8; }
-  /* 기기 위 남은 초: 숫자만 */
-  .tag { transform: translate(-50%, -100%); display: none; font-size: 13px; }
+  #sign.info { color: var(--c-text-2); }
+  .tag { transform: translate(-50%, -100%); display: none; font-size: var(--fs-small); } /* 기기 위 남은 초: 숫자만 */
 
-  /* 버튼: 작은 알약 */
-  #done, #drop, #quit { position: fixed; right: 14px; border: 0; border-radius: 999px; cursor: pointer; font-weight: 600; }
-  #done { bottom: 14px; font-size: 15px; padding: 9px 20px; background: rgba(255, 255, 255, 0.92); color: #1a1714; }
-  #drop { bottom: 58px; display: none; font-size: 13px; padding: 7px 14px; background: rgba(255, 255, 255, 0.75); color: #1a1714; }
-  .touch #drop.on { display: block; }
-  #quit { top: 10px; display: none; font-size: 12px; padding: 4px 11px; background: transparent; color: #fff; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.55); }
-  #done:active, #drop:active { transform: scale(0.96); }
+  /* ===== 공통: 버튼 =====
+     .btn 바탕 + 종류: primary(흰 바탕) · secondary(흰 테두리) · link(글자만) · card(모드 선택 카드)
+     게임 위에 뜨는 버튼은 .float (반투명 흰 바탕) */
+  .btn { display: inline-flex; flex-direction: column; align-items: center; justify-content: center; box-sizing: border-box;
+    min-height: var(--hit-min); padding: 0 22px; border: 0; border-radius: var(--r-pill); cursor: pointer;
+    font-size: var(--fs-body); font-weight: 600; line-height: 1.2; transition: transform 0.08s, opacity 0.15s; }
+  .btn:active { transform: scale(0.96); }                         /* 눌림 */
+  .btn:focus-visible { outline: none; box-shadow: var(--ring); }   /* 포커스 (키보드) */
+  .btn:disabled { opacity: 0.4; cursor: default; transform: none; } /* 사용할 수 없음 · 불러오는 중 */
+  .btn-primary { background: var(--c-surface); color: var(--c-on-surface); }
+  .btn-secondary { background: transparent; color: var(--c-text); box-shadow: inset 0 0 0 1px var(--c-line); }
+  .btn-secondary:focus-visible { box-shadow: inset 0 0 0 1px var(--c-line), var(--ring); }
+  .btn-link { background: transparent; color: var(--c-text-2); font-size: var(--fs-small); padding: 0 10px; text-decoration: underline; text-underline-offset: 3px; }
+  .btn small { display: block; font-size: var(--fs-caption); font-weight: 500; opacity: 0.6; margin-top: 2px; }
+  .btn-card { width: 150px; padding: var(--pad-card) 10px; border-radius: var(--r-card); }
+  .btn-card b { display: block; font-size: var(--fs-heading); }
+  .btn-card small { margin-top: 4px; }
+  @media (max-height: 500px) { .btn-card { width: 120px; } }
+
+  /* 게임 위에 떠 있는 버튼: 오른쪽 아래 완성 · 그 위 내려놓기 · 오른쪽 위 그만하기 */
+  #done, #drop, #quit { position: fixed; right: max(var(--edge), env(safe-area-inset-right)); }
+  #done { bottom: max(var(--edge), env(safe-area-inset-bottom)); background: var(--c-surface-float); display: none; } /* 게임 중에만 (JS가 켬) */
+  #count { display: none; }
+  #drop { bottom: calc(max(var(--edge), env(safe-area-inset-bottom)) + var(--hit-min) + var(--gap-m)); display: none; background: var(--c-surface-soft); font-size: var(--fs-small); }
+  .touch #drop.on { display: inline-flex; }
+  #quit { top: calc(var(--edge) - 4px); display: none; font-size: var(--fs-caption); padding: 0 12px; }
   /* 터치: 오른쪽 아래 엄지 버튼. 모서리·아래쪽 목표는 12mm 이상(Hoober), 엄지 접촉 폭 약 25mm(MIT Touch Lab)
      아이폰 가로 CSS 1px ≈ 0.166mm(약 6px/mm) → 완성 150×72px(25×12mm), 내려놓기 높이 54px(9mm) */
-  .touch #done { min-width: 150px; height: 72px; padding: 0 24px; font-size: 18px;
-    right: max(10px, env(safe-area-inset-right)); bottom: max(10px, env(safe-area-inset-bottom)); }
-  .touch #drop { height: 54px; min-width: 110px; padding: 0 18px; font-size: 15px;
-    right: max(10px, env(safe-area-inset-right)); bottom: calc(max(10px, env(safe-area-inset-bottom)) + 82px); }
+  .touch #done { min-width: 150px; height: 72px; font-size: 18px; }
+  .touch #drop { height: 54px; min-width: 110px; font-size: var(--fs-body); bottom: calc(max(var(--edge), env(safe-area-inset-bottom)) + 82px); }
 
-  /* 시작·끝 화면 */
-  .ov { position: fixed; inset: 0; background: rgba(20, 16, 12, 0.74); display: flex; flex-direction: column; align-items: center;
-    justify-content: safe center; gap: 10px; color: #fff; text-align: center; overflow-y: auto; box-sizing: border-box; padding: 16px; }
+  /* ===== 공통: 시작·설명·결과 화면 (가림막 + 가운데 정렬) ===== */
+  .ov { position: fixed; inset: 0; background: var(--c-scrim); display: flex; flex-direction: column; align-items: center;
+    justify-content: safe center; gap: var(--gap-m); color: var(--c-text); text-align: center; overflow-y: auto; box-sizing: border-box;
+    padding: 16px max(var(--edge), env(safe-area-inset-right)) 16px max(var(--edge), env(safe-area-inset-left)); }
   .ov > * { flex-shrink: 0; }
   .ov.hidden { display: none; }
-  .ov h1, .ov h2 { margin: 0; font-size: 30px; font-weight: 700; letter-spacing: 0.02em; }
-  .ov h2 { font-size: 18px; opacity: 0.8; }
-  .ov .big { font-size: 56px; font-weight: 700; font-variant-numeric: tabular-nums; }
-  .ov p { margin: 0; line-height: 1.6; font-size: 13px; opacity: 0.75; }
-  .ov .new { color: #ffd27a; font-size: 13px; font-weight: 700; letter-spacing: 0.12em; opacity: 1; }
-  .ov .modes { display: flex; gap: 10px; margin-top: 6px; }
-  .ov button { font-size: 15px; font-weight: 600; padding: 10px 22px; border: 0; border-radius: 999px; background: #fff; color: #1a1714; cursor: pointer; }
-  .ov button small { display: block; font-size: 11px; font-weight: 500; opacity: 0.6; margin-top: 2px; }
-  .ov .cards { display: flex; gap: 12px; margin-top: 8px; }
-  .ov .cards button { width: 150px; padding: 18px 10px; border-radius: 16px; }
-  .ov .cards b { display: block; font-size: 17px; }
-  .ov .cards small { margin-top: 4px; font-size: 12px; }
-  .ov .a2hs { display: none; font-size: 12px; } .ios-browser .ov .a2hs { display: block; }
-  .ov .link { background: transparent; color: #fff; opacity: 0.7; font-size: 13px; padding: 6px 10px; text-decoration: underline; text-underline-offset: 3px; }
-  #ovHelp { background: rgba(20, 16, 12, 0.86); z-index: 5; }
+  .ov h1 { margin: 0; font-size: var(--fs-title); font-weight: 700; letter-spacing: 0.02em; }
+  .ov h2 { margin: 0; font-size: var(--fs-heading); font-weight: 700; color: var(--c-text-2); }
+  .ov .big { font-size: var(--fs-display); font-weight: 700; font-variant-numeric: tabular-nums; }
+  .ov p { margin: 0; line-height: 1.6; font-size: var(--fs-small); color: var(--c-text-2); }
+  .ov .new { color: var(--c-accent); font-weight: 700; letter-spacing: 0.12em; }
+  .ov .row { display: flex; gap: var(--gap-m); margin-top: var(--gap-s); }
+  .ov .cards { display: flex; gap: var(--gap-l); margin-top: 8px; }
+  .ov .a2hs { display: none; font-size: var(--fs-caption); } .ios-browser .ov .a2hs { display: block; }
+  .ov .status { font-size: var(--fs-caption); color: var(--c-text-3); }
+  .ov .status.error { color: var(--c-danger); }
+  #ovHelp { background: var(--c-scrim-strong); z-index: 5; }
   .help { max-width: 560px; text-align: left; }
-  .help h2 { font-size: 20px; opacity: 1; margin-bottom: 10px; }
-  .help .goal { opacity: 1; font-weight: 600; margin-bottom: 6px; }
-  .help ol { margin: 0 0 8px; padding-left: 20px; font-size: 13px; line-height: 1.7; opacity: 0.85; }
-  .help button { margin-top: 12px; }
-  .ov .sub { background: transparent; color: #fff; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.6); }
-  .ov button:active { transform: scale(0.96); }
-
-  /* 폰 가로 화면 (높이 작음): 기본 규칙을 덮어써야 하므로 맨 끝에 둠 */
-  @media (max-height: 500px) {
-    #count { top: 8px; left: max(12px, env(safe-area-inset-left)); font-size: 13px; } #sign { top: 27px; left: max(12px, env(safe-area-inset-left)); font-size: 11px; }
-    .tag { font-size: 11px; }
-    #done { right: 12px; bottom: 10px; font-size: 13px; padding: 7px 16px; } #drop { right: 12px; bottom: 46px; font-size: 12px; padding: 6px 12px; }
-    #quit { right: 12px; top: 7px; }
-    .ov { gap: 6px; padding: 8px max(12px, env(safe-area-inset-right)) 8px max(12px, env(safe-area-inset-left)); }
-    .ov h1 { font-size: 22px; } .ov .big { font-size: 36px; } .ov p { font-size: 10px; line-height: 1.45; }
-    .ov button { font-size: 13px; padding: 7px 16px; }
-    .ov .cards { gap: 8px; margin-top: 4px; } .ov .cards button { width: 120px; padding: 12px 8px; } .ov .cards b { font-size: 14px; } .ov .cards small { font-size: 10px; }
-    .help h2 { font-size: 15px; margin-bottom: 4px; } .help ol { font-size: 10px; line-height: 1.5; } .help button { margin-top: 6px; }
-  }
+  .help h2 { color: var(--c-text); margin-bottom: var(--gap-m); }
+  .help .goal { color: var(--c-text); font-weight: 600; margin-bottom: var(--gap-s); }
+  .help ol { margin: 0 0 8px; padding-left: 20px; font-size: var(--fs-small); line-height: 1.7; color: var(--c-text-2); }
+  .help .btn { margin-top: var(--gap-l); }
+  @media (max-height: 500px) { .ov { padding-top: 8px; padding-bottom: 8px; } .ov p { line-height: 1.45; } .help ol { line-height: 1.5; } }
 </style>
 <script type="importmap">
 { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" } }
@@ -116,9 +154,9 @@
 <body>
 <div class="hud" id="count"></div>
 <div id="sign"></div>
-<button id="done">완성</button>
-<button id="drop">내려놓기</button>
-<button id="quit">그만하기</button>
+<button class="btn btn-primary" id="done">완성</button>
+<button class="btn btn-primary" id="drop">내려놓기</button>
+<button class="btn btn-secondary" id="quit">그만하기</button>
 <div id="rotate">가로로 돌려 주세요</div>
 <div id="err"></div>
 <div class="tag" id="waterTag"></div>
@@ -126,11 +164,12 @@
 <div class="ov" id="ovStart">
   <h1>아아 장인</h1>
   <div class="cards">
-    <button id="startTimed"><b>1분 도전</b><small id="bestTimed"></small></button>
-    <button id="startThree"><b>3잔 도전</b><small id="bestThree"></small></button>
-    <button id="startPractice"><b>연습</b><small id="bestPractice"></small></button>
+    <button class="btn btn-primary btn-card" id="startTimed" disabled><b>1분 도전</b><small id="bestTimed"></small></button>
+    <button class="btn btn-primary btn-card" id="startThree" disabled><b>3잔 도전</b><small id="bestThree"></small></button>
+    <button class="btn btn-primary btn-card" id="startPractice" disabled><b>연습</b><small id="bestPractice"></small></button>
   </div>
-  <button class="link" id="helpBtn">게임 설명</button>
+  <button class="btn btn-link" id="helpBtn">게임 설명</button>
+  <p class="status" id="loadStatus">불러오는 중…</p>
   <p class="a2hs" id="a2hs">주소창 없이 하려면: 공유 → 홈 화면에 추가 → 홈 화면 아이콘으로 실행</p>
 </div>
 <div class="ov hidden" id="ovHelp">
@@ -147,7 +186,7 @@
     <p>원두는 결합하고 30초, 샷은 받고 1분이 지나면 못 써요. 망친 컵은 싱크대에.<br>
       컵이 2개 이상이면 컵을 클릭해 고를 수 있어요. 그룹 · 포터필터 · 샷잔은 2개씩.<br>
       <span class="pcOnly">우클릭 = 내려놓기 · Space = 완성 · Esc = 그만하기</span><span class="touchOnly">아이폰: 공유 → 홈 화면에 추가 → 아이콘으로 실행하면 주소창 없이 전체 화면</span></p>
-    <button id="helpClose">닫기</button>
+    <button class="btn btn-primary" id="helpClose">닫기</button>
   </div>
 </div>
 <div class="ov hidden" id="ovEnd">
@@ -155,9 +194,9 @@
   <div class="big" id="endCount">0잔</div>
   <p class="new" id="endNew">NEW RECORD</p>
   <p id="endInfo"></p>
-  <div class="modes">
-    <button id="againBtn">다시 하기</button>
-    <button class="sub" id="menuBtn">메뉴로</button>
+  <div class="row">
+    <button class="btn btn-primary" id="againBtn">다시 하기</button>
+    <button class="btn btn-secondary" id="menuBtn">메뉴로</button>
   </div>
 </div>
 
@@ -1471,7 +1510,7 @@ function tagAt(id, show, pos, text) {
 const fmtT = t => Math.floor(t / 60) + ':' + (t % 60).toFixed(1).padStart(4, '0');
 function hud() {
   const playing = phase === 'play'; // 메뉴·결과 화면에선 왼쪽 위 글자·완성 버튼 숨김
-  $('count').style.display = playing ? '' : 'none'; $('done').style.display = playing ? '' : 'none';
+  $('count').style.display = playing ? 'block' : 'none'; $('done').style.display = playing ? 'inline-flex' : 'none'; $('sign').style.display = playing ? '' : 'none';
   $('drop').classList.toggle('on', !!right && phase === 'play');
   const t = mode === 'timed' ? `<span class="${timeLeft < 10 ? 'hurry' : ''}">${Math.ceil(timeLeft)}초</span>` : fmtT(elapsed);
   const bst = mode === 'timed' ? (best ? '최고 ' + best + '잔' : '') : mode === 'three' ? (best3 ? '최고 ' + fmtT(best3) : '')
@@ -1491,7 +1530,7 @@ function startGame(m = mode) {
   if (!AC) { try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} }
   AC?.resume?.();
   mode = m; resetGame(); phase = 'play'; started = false;
-  $('quit').style.display = mode !== 'timed' ? 'block' : 'none';
+  $('quit').style.display = mode !== 'timed' ? 'inline-flex' : 'none';
   $('ovStart').classList.add('hidden'); $('ovHelp').classList.add('hidden'); $('ovEnd').classList.add('hidden');
 }
 function endGame() {
@@ -1551,6 +1590,9 @@ addEventListener('keydown', e => {
   else if (phase === 'play' && mode !== 'timed') endGame();
 });
 showMenu();
+// 준비 끝: 모드 카드 켜기 · '불러오는 중' 숨기기
+['startTimed', 'startThree', 'startPractice'].forEach(id => $(id).disabled = false);
+$('loadStatus').style.display = 'none';
 
 function resize() { UI = Math.min(1, innerHeight / 900); renderer.setSize(innerWidth, innerHeight); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); placeCamera(); }
 addEventListener('resize', resize); resize(); updNdc();
