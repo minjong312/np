@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
@@ -11,12 +11,22 @@
   addEventListener('error', e => { const b = document.getElementById('err'); if (b) { b.style.display = 'block'; b.textContent += (e.message || e) + ' @' + (e.lineno || '') + '\n'; } });
   addEventListener('unhandledrejection', e => { const b = document.getElementById('err'); if (b) { b.style.display = 'block'; b.textContent += 'promise: ' + e.reason + '\n'; } });
   if (matchMedia('(pointer: coarse)').matches) document.documentElement.classList.add('touch');
+  // 아이폰 사파리: 새로고침하면 전에 확대한 배율을 되살림 → 열 때·돌릴 때 배율 1로 다시 맞춤 (뷰포트 설정을 바꿨다가 되돌리면 다시 적용됨)
+  (() => {
+    const VP = 'width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover';
+    const reset = () => { const m = document.querySelector('meta[name=viewport]'); if (!m) return;
+      m.setAttribute('content', VP.replace('initial-scale=1', 'initial-scale=0.99')); setTimeout(() => m.setAttribute('content', VP), 50); };
+    addEventListener('load', reset); addEventListener('pageshow', reset); addEventListener('orientationchange', () => setTimeout(reset, 300));
+    if (window.visualViewport) visualViewport.addEventListener('resize', () => { if (Math.abs(visualViewport.scale - 1) > 0.01) reset(); });
+  })();
 </script>
 <title>[아아 장인]</title>
 <style>
   html, body { margin: 0; height: 100%; overflow: hidden; background: #1a1714; user-select: none;
     font-family: -apple-system, "Apple SD Gothic Neo", "Pretendard", "Malgun Gothic", sans-serif; }
   html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; } /* iOS 가로 회전 시 글자 자동 확대 막기 */
+  html, body { touch-action: none; } /* 핀치·두 번 탭 확대 막기 */
+  button { touch-action: manipulation; } .ov { touch-action: pan-y; } /* 버튼은 바로 눌림, 시작·설명 화면은 위아래 스크롤만 */
   canvas { display: block; cursor: crosshair; touch-action: none; }
   body { -webkit-touch-callout: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent; }
   button { font-family: inherit; }
