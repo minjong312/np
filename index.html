@@ -15,6 +15,7 @@
 <title>[아아 장인]</title>
 <style>
   html, body { margin: 0; height: 100%; overflow: hidden; background: #1a1714; font-family: "Malgun Gothic", "Apple SD Gothic Neo", sans-serif; user-select: none; }
+  html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; } /* iOS 가로 회전 시 글자 자동 확대 막기 */
   canvas { display: block; cursor: crosshair; touch-action: none; }
   body { -webkit-touch-callout: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent; }
   #drop {
@@ -37,8 +38,11 @@
     #quit { right: 12px; top: 34px; }
     #laps { top: 70px; right: 12px; font-size: 12px; }
     #sign { top: 50px; font-size: 16px; padding: 6px 14px; }
-    .ov { gap: 8px; } .ov h1 { font-size: 34px; } .ov h2 { font-size: 26px; } .ov .big { font-size: 46px; }
-    .ov p { font-size: 11px; line-height: 1.5; } .ov button { font-size: 18px; padding: 8px 20px; }
+    .ov { gap: 6px; padding: 8px max(12px, env(safe-area-inset-right)) 8px max(12px, env(safe-area-inset-left)); }
+    .ov h1 { font-size: 28px; } .ov h2 { font-size: 24px; } .ov .big { font-size: 40px; }
+    .ov p { font-size: 10px; line-height: 1.45; } .ov button { font-size: 16px; padding: 6px 16px; }
+    .ov .modes { gap: 10px; } .ov .modes button small { font-size: 11px; margin-top: 2px; }
+    #ovStart .modes { order: -1; } #ovStart h1 { order: -2; } /* 버튼을 제목 바로 아래로: 설명이 길어도 시작 가능 */
   }
   .hud { position: fixed; pointer-events: none; color: #fff; font-weight: bold; text-shadow: 0 3px 0 #000, 0 0 2px #000; }
   #count { top: 14px; left: 18px; font-size: 30px; }
@@ -78,7 +82,8 @@
   @keyframes up { 0% { opacity: 0; transform: translate(-50%, -30%) scale(0.5); } 15% { opacity: 1; transform: translate(-50%, -50%) scale(1.2); }
     30% { transform: translate(-50%, -50%) scale(1); } 100% { opacity: 0; transform: translate(-50%, -160%); } }
   .ov { position: fixed; inset: 0; background: rgba(20, 14, 10, 0.82); display: flex; flex-direction: column; align-items: center;
-    justify-content: center; gap: 14px; color: #fff; text-align: center; }
+    justify-content: safe center; gap: 14px; color: #fff; text-align: center; overflow-y: auto; box-sizing: border-box; }
+  .ov > * { flex-shrink: 0; }
   .ov.hidden { display: none; }
   .ov h1 { margin: 0; font-size: 60px; color: #ffe27a; text-shadow: 0 6px 0 #6b3d22; }
   .ov h2 { margin: 0; font-size: 40px; color: #ffe27a; }
@@ -1341,6 +1346,9 @@ showMenu();
 
 function resize() { UI = Math.min(1, innerHeight / 900); renderer.setSize(innerWidth, innerHeight); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); }
 addEventListener('resize', resize); resize(); updNdc();
+// iOS 사파리: 회전 직후 innerWidth/innerHeight가 늦게 바뀜 → 조금 뒤 다시 맞춤
+addEventListener('orientationchange', () => { setTimeout(resize, 100); setTimeout(resize, 500); });
+if (window.visualViewport) visualViewport.addEventListener('resize', resize);
 
 let last = performance.now();
 renderer.setAnimationLoop(now => {
