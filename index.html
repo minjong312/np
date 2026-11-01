@@ -58,6 +58,17 @@
   .ov .modes { display: flex; gap: 10px; margin-top: 6px; }
   .ov button { font-size: 15px; font-weight: 600; padding: 10px 22px; border: 0; border-radius: 999px; background: #fff; color: #1a1714; cursor: pointer; }
   .ov button small { display: block; font-size: 11px; font-weight: 500; opacity: 0.6; margin-top: 2px; }
+  .ov .cards { display: flex; gap: 12px; margin-top: 8px; }
+  .ov .cards button { width: 150px; padding: 18px 10px; border-radius: 16px; }
+  .ov .cards b { display: block; font-size: 17px; }
+  .ov .cards small { margin-top: 4px; font-size: 12px; }
+  .ov .link { background: transparent; color: #fff; opacity: 0.7; font-size: 13px; padding: 6px 10px; text-decoration: underline; text-underline-offset: 3px; }
+  #ovHelp { background: rgba(20, 16, 12, 0.86); z-index: 5; }
+  .help { max-width: 560px; text-align: left; }
+  .help h2 { font-size: 20px; opacity: 1; margin-bottom: 10px; }
+  .help .goal { opacity: 1; font-weight: 600; margin-bottom: 6px; }
+  .help ol { margin: 0 0 8px; padding-left: 20px; font-size: 13px; line-height: 1.7; opacity: 0.85; }
+  .help button { margin-top: 12px; }
   .ov .sub { background: transparent; color: #fff; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.6); }
   .ov button:active { transform: scale(0.96); }
 
@@ -70,7 +81,8 @@
     .ov { gap: 6px; padding: 8px max(12px, env(safe-area-inset-right)) 8px max(12px, env(safe-area-inset-left)); }
     .ov h1 { font-size: 22px; } .ov .big { font-size: 36px; } .ov p { font-size: 10px; line-height: 1.45; }
     .ov button { font-size: 13px; padding: 7px 16px; }
-    #ovStart .modes { order: -1; } #ovStart h1 { order: -2; } /* 버튼을 제목 바로 아래로 */
+    .ov .cards { gap: 8px; margin-top: 4px; } .ov .cards button { width: 120px; padding: 12px 8px; } .ov .cards b { font-size: 14px; } .ov .cards small { font-size: 10px; }
+    .help h2 { font-size: 15px; margin-bottom: 4px; } .help ol { font-size: 10px; line-height: 1.5; } .help button { margin-top: 6px; }
   }
 </style>
 <script type="importmap">
@@ -89,14 +101,28 @@
 <div class="tag" id="grpTag0"></div><div class="tag" id="grpTag1"></div>
 <div class="ov" id="ovStart">
   <h1>아아 장인</h1>
-  <p>얼음 가득 · 물 80% · 샷 · 뚜껑 · 홀더<br>
-    컵 꺼내기 → 정수기 클릭 · 아이스빈 두 번 → 컵 클릭 · 포터필터 잡고 ← 돌려 빼기 → 드로어 → 분쇄기 → 탬퍼 → 머신 → 버튼<br>
-    샷잔 → 컵 · 뚜껑 · 홀더 · 망친 컵은 싱크대 · 원두는 결합 후 30초, 샷은 1분 안에</p>
-  <p class="touchOnly">아이폰: 공유 → 홈 화면에 추가하면 전체 화면</p>
-  <p id="startBest"></p>
-  <div class="modes">
-    <button id="startTimed">1분<small>60초 동안 몇 잔</small></button>
-    <button id="startPractice">연습<small>잔마다 기록</small></button>
+  <div class="cards">
+    <button id="startTimed"><b>1분 도전</b><small id="bestTimed"></small></button>
+    <button id="startThree"><b>3잔 도전</b><small id="bestThree"></small></button>
+    <button id="startPractice"><b>연습</b><small id="bestPractice"></small></button>
+  </div>
+  <button class="link" id="helpBtn">게임 설명</button>
+</div>
+<div class="ov hidden" id="ovHelp">
+  <div class="help">
+    <h2>게임 설명</h2>
+    <p class="goal">얼음 가득 · 물 80% · 샷 · 뚜껑 · 홀더를 채운 컵이 한 잔</p>
+    <ol>
+      <li>컵 보관대 클릭 → 컵 꺼내기. 정수기 클릭 → 컵이 아래로 가서 물이 자동으로 참</li>
+      <li>아이스빈 클릭(스쿱 잡기) → 다시 클릭(얼음 푸기) → 컵 클릭</li>
+      <li>포터필터 핸들 클릭 → ← 드래그로 돌려 빼기 → 드로어 클릭(퍽 털기)</li>
+      <li>분쇄기 클릭(자동 분쇄) → 탬퍼 클릭 → 머신 클릭(결합) → 초록 버튼(추출)</li>
+      <li>샷잔 클릭 → 컵 클릭. 뚜껑 · 홀더 클릭 → 완성</li>
+    </ol>
+    <p>원두는 결합하고 30초, 샷은 받고 1분이 지나면 못 써요. 망친 컵은 싱크대에.<br>
+      컵이 2개 이상이면 컵을 클릭해 고를 수 있어요. 그룹 · 포터필터 · 샷잔은 2개씩.<br>
+      <span class="pcOnly">우클릭 = 내려놓기 · Space = 완성 · Esc = 그만하기</span><span class="touchOnly">아이폰: 공유 → 홈 화면에 추가하면 전체 화면</span></p>
+    <button id="helpClose">닫기</button>
   </div>
 </div>
 <div class="ov hidden" id="ovEnd">
@@ -116,7 +142,8 @@ const V3 = THREE.Vector3;
 
 // ===== 상수 =====
 const GAME_TIME = 60;
-const BEST_KEY = 'aaJangin.best60', LAP_KEY = 'aaJangin.bestLap';
+const BEST_KEY = 'aaJangin.best60', LAP_KEY = 'aaJangin.bestLap', BEST3_KEY = 'aaJangin.best3';
+const GOAL_CUPS = 3; // 3잔 모드 목표
 const TOP = 0.9;
 const GX = -0.62, WX = 0.6, CSX = 0.9, IX = 1.36, SX = 2.12; // SX = 싱크대
 // 머신 그룹 2개 (왼쪽 0, 오른쪽 1): 그룹헤드 · 샷잔 자리(드립 트레이) · 추출 버튼
@@ -600,7 +627,8 @@ function spillIce(pos, vel) { part(cubeGeo, cubeMat, pos, vel, { shadow: true, l
 // ===== 게임 상태 =====
 let phase = 'ready', mode = 'timed', timeLeft = GAME_TIME, elapsed = 0, count = 0, best = 0, bestLap = 0;
 let laps = [], lapStart = 0, waterFill = null, grinding = false;
-try { best = parseInt(localStorage.getItem(BEST_KEY)) || 0; bestLap = parseFloat(localStorage.getItem(LAP_KEY)) || 0; } catch (e) {}
+let best3 = 0; // 3잔 모드 최단 시간(초)
+try { best = parseInt(localStorage.getItem(BEST_KEY)) || 0; bestLap = parseFloat(localStorage.getItem(LAP_KEY)) || 0; best3 = parseFloat(localStorage.getItem(BEST3_KEY)) || 0; } catch (e) {}
 let right = null;      // null | {type:'cup', cup} | {type:'pf', pf} | {type:'pfGrip', p, pf} | {type:'glass', gl} | {type:'scoop'}
 let leftHold = null;   // null | {type:'pf', pf} (탬핑 중)
 let brews = [null, null]; // 그룹별 추출 { t, burnt, pf }
@@ -1066,6 +1094,7 @@ function complete() {
     removeCup(c);
   }
   SFX.ding();
+  if (mode === 'three' && count >= GOAL_CUPS) endGame(); // 3잔 모드: 3잔 채우면 끝
 }
 
 // ===== 업데이트 =====
@@ -1415,10 +1444,13 @@ function tagAt(id, show, pos, text) {
 }
 const fmtT = t => Math.floor(t / 60) + ':' + (t % 60).toFixed(1).padStart(4, '0');
 function hud() {
+  const playing = phase === 'play'; // 메뉴·결과 화면에선 왼쪽 위 글자·완성 버튼 숨김
+  $('count').style.display = playing ? '' : 'none'; $('done').style.display = playing ? '' : 'none';
   $('drop').classList.toggle('on', !!right && phase === 'play');
   const t = mode === 'timed' ? `<span class="${timeLeft < 10 ? 'hurry' : ''}">${Math.ceil(timeLeft)}초</span>` : fmtT(elapsed);
-  const bst = mode === 'timed' ? (best ? '최고 ' + best + '잔' : '') : (laps.length ? '마지막 ' + laps[laps.length - 1].toFixed(1) + '초' : bestLap ? '최고 ' + bestLap.toFixed(1) + '초' : '');
-  $('count').innerHTML = `${count}잔<span class="dim">${t}</span>` + (bst ? `<span class="dim">${bst}</span>` : '');
+  const bst = mode === 'timed' ? (best ? '최고 ' + best + '잔' : '') : mode === 'three' ? (best3 ? '최고 ' + fmtT(best3) : '')
+    : (laps.length ? '마지막 ' + laps[laps.length - 1].toFixed(1) + '초' : bestLap ? '최고 ' + bestLap.toFixed(1) + '초' : '');
+  $('count').innerHTML = (mode === 'three' ? `${count}/${GOAL_CUPS}잔` : `${count}잔`) + `<span class="dim">${t}</span>` + (bst ? `<span class="dim">${bst}</span>` : '');
   // 기기 위 남은 초: 숫자만 (탄 원두·식은 샷은 연기·색으로)
   GROUPS.forEach((G, gi) => {
     const brew = brews[gi];
@@ -1433,8 +1465,8 @@ function startGame(m = mode) {
   if (!AC) { try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} }
   AC?.resume?.();
   mode = m; resetGame(); phase = 'play';
-  $('quit').style.display = mode === 'practice' ? 'block' : 'none';
-  $('ovStart').classList.add('hidden'); $('ovEnd').classList.add('hidden');
+  $('quit').style.display = mode !== 'timed' ? 'block' : 'none';
+  $('ovStart').classList.add('hidden'); $('ovHelp').classList.add('hidden'); $('ovEnd').classList.add('hidden');
 }
 function endGame() {
   if (phase !== 'play') return;
@@ -1449,6 +1481,13 @@ function endGame() {
     $('endTitle').textContent = '영업 종료';
     $('endCount').textContent = count + '잔';
     $('endInfo').textContent = '내 최고 기록: ' + best + '잔';
+  } else if (mode === 'three') {
+    const done = count >= GOAL_CUPS;
+    isNew = done && (!best3 || elapsed < best3);
+    if (isNew) { best3 = elapsed; try { localStorage.setItem(BEST3_KEY, String(best3)); } catch (e) {} }
+    $('endTitle').textContent = done ? GOAL_CUPS + '잔 완성' : '그만둠';
+    $('endCount').textContent = done ? fmtT(elapsed) : count + '/' + GOAL_CUPS + '잔';
+    $('endInfo').textContent = best3 ? '내 최고 기록: ' + fmtT(best3) : '';
   } else {
     const fast = laps.length ? Math.min(...laps) : 0, avg = laps.length ? laps.reduce((a, b) => a + b, 0) / laps.length : 0;
     isNew = fast > 0 && (!bestLap || fast < bestLap);
@@ -1466,15 +1505,25 @@ function endGame() {
 function showMenu() {
   phase = 'ready'; resetGame();
   $('quit').style.display = 'none';
-  $('ovEnd').classList.add('hidden'); $('ovStart').classList.remove('hidden');
-  $('startBest').textContent = [best ? '1분 최고 ' + best + '잔' : '', bestLap ? '연습 최고 한 잔 ' + bestLap.toFixed(1) + '초' : ''].filter(Boolean).join(' · ');
+  $('ovEnd').classList.add('hidden'); $('ovHelp').classList.add('hidden'); $('ovStart').classList.remove('hidden');
+  $('bestTimed').textContent = best ? '최고 ' + best + '잔' : '기록 없음';
+  $('bestThree').textContent = best3 ? '최고 ' + fmtT(best3) : '기록 없음';
+  $('bestPractice').textContent = bestLap ? '최고 한 잔 ' + bestLap.toFixed(1) + '초' : '시간 제한 없음';
 }
 $('startTimed').onclick = () => startGame('timed');
+$('startThree').onclick = () => startGame('three');
 $('startPractice').onclick = () => startGame('practice');
+const showHelp = on => { $('ovHelp').classList.toggle('hidden', !on); $('ovStart').classList.toggle('hidden', on); };
+$('helpBtn').onclick = () => showHelp(true);
+$('helpClose').onclick = () => showHelp(false);
 $('againBtn').onclick = () => startGame();
 $('menuBtn').onclick = showMenu;
 $('quit').onclick = e => { endGame(); e.currentTarget.blur(); };
-addEventListener('keydown', e => { if (e.code === 'Escape' && phase === 'play' && mode === 'practice') endGame(); });
+addEventListener('keydown', e => {
+  if (e.code !== 'Escape') return;
+  if (!$('ovHelp').classList.contains('hidden')) showHelp(false);
+  else if (phase === 'play' && mode !== 'timed') endGame();
+});
 showMenu();
 
 function resize() { UI = Math.min(1, innerHeight / 900); renderer.setSize(innerWidth, innerHeight); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); placeCamera(); }
