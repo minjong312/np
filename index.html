@@ -5,12 +5,19 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="아아 장인">
+<!-- 홈 화면에 추가하면 주소창 없이 실행 (아이폰 사파리는 웹페이지 전체 화면을 지원 안 함) -->
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-180.png">
 <script>
   // 맥 없이 아이폰에서 오류 보기: 화면 왼쪽 위에 빨간 상자로 표시
   addEventListener('error', e => { const b = document.getElementById('err'); if (b) { b.style.display = 'block'; b.textContent += (e.message || e) + ' @' + (e.lineno || '') + '\n'; } });
   addEventListener('unhandledrejection', e => { const b = document.getElementById('err'); if (b) { b.style.display = 'block'; b.textContent += 'promise: ' + e.reason + '\n'; } });
   if (matchMedia('(pointer: coarse)').matches) document.documentElement.classList.add('touch');
+  // 아이폰·아이패드 사파리에서 홈 화면 앱으로 실행한 게 아니면 '홈 화면에 추가' 안내
+  if (/iP(hone|ad|od)/.test(navigator.userAgent) && !navigator.standalone && !matchMedia('(display-mode: standalone), (display-mode: fullscreen)').matches)
+    document.documentElement.classList.add('ios-browser');
   // 아이폰 사파리: 새로고침하면 전에 확대한 배율을 되살림 → 열 때·돌릴 때 배율 1로 다시 맞춤 (뷰포트 설정을 바꿨다가 되돌리면 다시 적용됨)
   (() => {
     const VP = 'width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover';
@@ -38,10 +45,10 @@
 
   /* 왼쪽 위: 잔 수 · 시간 · 최고 한 줄, 그 아래 경고 한 줄 */
   .hud, #sign, .tag { position: fixed; pointer-events: none; color: #fff; font-weight: 600; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7); font-variant-numeric: tabular-nums; }
-  #count { top: 12px; left: 14px; font-size: 15px; white-space: nowrap; }
+  #count { top: 12px; left: max(14px, env(safe-area-inset-left)); font-size: 15px; white-space: nowrap; }
   #count .dim { opacity: 0.6; margin-left: 10px; }
   #count .hurry { color: #ff8a7a; }
-  #sign { top: 34px; left: 14px; font-size: 13px; color: #ffd9a0; opacity: 0; transition: opacity 0.15s; white-space: nowrap; }
+  #sign { top: 34px; left: max(14px, env(safe-area-inset-left)); font-size: 13px; color: #ffd9a0; opacity: 0; transition: opacity 0.15s; white-space: nowrap; }
   #sign.show { opacity: 1; }
   #sign.info { color: #e8e2d8; }
   /* 기기 위 남은 초: 숫자만 */
@@ -78,6 +85,7 @@
   .ov .cards button { width: 150px; padding: 18px 10px; border-radius: 16px; }
   .ov .cards b { display: block; font-size: 17px; }
   .ov .cards small { margin-top: 4px; font-size: 12px; }
+  .ov .a2hs { display: none; font-size: 12px; } .ios-browser .ov .a2hs { display: block; }
   .ov .link { background: transparent; color: #fff; opacity: 0.7; font-size: 13px; padding: 6px 10px; text-decoration: underline; text-underline-offset: 3px; }
   #ovHelp { background: rgba(20, 16, 12, 0.86); z-index: 5; }
   .help { max-width: 560px; text-align: left; }
@@ -90,7 +98,7 @@
 
   /* 폰 가로 화면 (높이 작음): 기본 규칙을 덮어써야 하므로 맨 끝에 둠 */
   @media (max-height: 500px) {
-    #count { top: 8px; left: 12px; font-size: 13px; } #sign { top: 27px; left: 12px; font-size: 11px; }
+    #count { top: 8px; left: max(12px, env(safe-area-inset-left)); font-size: 13px; } #sign { top: 27px; left: max(12px, env(safe-area-inset-left)); font-size: 11px; }
     .tag { font-size: 11px; }
     #done { right: 12px; bottom: 10px; font-size: 13px; padding: 7px 16px; } #drop { right: 12px; bottom: 46px; font-size: 12px; padding: 6px 12px; }
     #quit { right: 12px; top: 7px; }
@@ -123,6 +131,7 @@
     <button id="startPractice"><b>연습</b><small id="bestPractice"></small></button>
   </div>
   <button class="link" id="helpBtn">게임 설명</button>
+  <p class="a2hs" id="a2hs">주소창 없이 하려면: 공유 → 홈 화면에 추가 → 홈 화면 아이콘으로 실행</p>
 </div>
 <div class="ov hidden" id="ovHelp">
   <div class="help">
@@ -137,7 +146,7 @@
     </ol>
     <p>원두는 결합하고 30초, 샷은 받고 1분이 지나면 못 써요. 망친 컵은 싱크대에.<br>
       컵이 2개 이상이면 컵을 클릭해 고를 수 있어요. 그룹 · 포터필터 · 샷잔은 2개씩.<br>
-      <span class="pcOnly">우클릭 = 내려놓기 · Space = 완성 · Esc = 그만하기</span><span class="touchOnly">아이폰: 공유 → 홈 화면에 추가하면 전체 화면</span></p>
+      <span class="pcOnly">우클릭 = 내려놓기 · Space = 완성 · Esc = 그만하기</span><span class="touchOnly">아이폰: 공유 → 홈 화면에 추가 → 아이콘으로 실행하면 주소창 없이 전체 화면</span></p>
     <button id="helpClose">닫기</button>
   </div>
 </div>
