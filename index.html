@@ -118,11 +118,12 @@
 <div id="sign"></div>
 <div id="fx"></div>
 <div class="tag" id="heatTag"></div>
+<div class="tag" id="waterTag"></div>
 <div class="tag" id="glassTag"></div>
 <div class="ov" id="ovStart">
   <h1>[아아 장인]</h1>
   <p><b>아이스 아메리카노: 얼음 가득 + 물 80% + 샷 + 뚜껑 + 홀더</b><br>
-    컵 보관대에서 컵 꺼내기 · 정수기 클릭 → 컵이 정수기 아래로 가서 물 자동 (5초, 그동안 다른 일 하기!)<br>
+    컵 보관대에서 컵 꺼내기 · 정수기 클릭 → 컵이 정수기 아래로 가서 물 자동 (10초, 그동안 다른 일 하기!)<br>
     아이스빈 클릭 → 스쿱 잡기 → 아이스빈 다시 클릭 → 얼음 푸기 → 컵 클릭 → 얼음 가득 (다른 걸 누르면 스쿱은 자동으로 내려놓음)<br>
     포터필터 클릭(핸들 잡기) → <b>←</b> 드래그로 돌려 빼기 → 드로어 위에서 <b>↓</b> 털기 → 분쇄기에 거치(자동 분쇄) → 탬퍼 클릭<br>
     → 그룹헤드 <b>정확히 아래</b>로 화면 안쪽으로 밀어 넣기(자동 결합) → <b>30초 안에</b> 초록 버튼 추출 → 샷잔 집어 컵 클릭 (샷은 1분 두면 식어요)<br>
@@ -164,6 +165,7 @@ const TAMPER_HOME = new V3(-0.43, TOP + 0.015, 0.03);
 const SCOOP_X = 1.79;
 const SCOOP_HOME = new V3(SCOOP_X, TOP + 0.11, -0.3);
 const TAP = new V3(WX, TOP + 0.29, -0.21);
+const LID_TOP = new V3(-0.2, TOP + 0.73, -0.42), SLEEVE_TOP = new V3(0.08, TOP + 0.74, -0.42); // 머신 위 뚜껑·홀더 더미 꼭대기
 const BREW_BTN = new V3(-0.17, TOP + 0.49, -0.2);
 const ATTACH_TOL_X = matchMedia('(pointer: coarse)').matches ? 0.03 : 0.022, ATTACH_TOL_Z = 0.03, ATTACH_NEAR = 0.12;
 const LOCK_PX = 130;
@@ -172,7 +174,7 @@ const TOUCH = matchMedia('(pointer: coarse)').matches;
 let UI = 1;
 const px = n => n * UI;
 const MAGNET_PX = TOUCH ? 110 : 80;
-const BREW_TIME = 3, WATER_TARGET = 0.8, WATER_TIME = 5, WATER_RATE = WATER_TARGET / WATER_TIME, GRIND_TIME = 1.4;
+const BREW_TIME = 3, WATER_TARGET = 0.8, WATER_TIME = 10, WATER_RATE = WATER_TARGET / WATER_TIME, GRIND_TIME = 1.4;
 const BURN_TIME = 30;  // 탬핑한 포터필터를 결합하고 이 시간 안에 추출 안 하면 탄 샷
 const COLD_TIME = 60;  // 샷잔에 받은 샷을 머신 위에 이 시간 넘게 두면 식은 샷
 const CUP_ICE_MAX = 15, SCOOP_CUBES = CUP_ICE_MAX; // 스쿱 한 번 = 컵 가득
@@ -518,6 +520,7 @@ function makeCup() {
   c.lidM = cyl(g, 0.049, 0.049, 0.014, '#ffffff', 0, 0.13, 0, 14);
   cyl(c.lidM, 0.035, 0.045, 0.012, '#ffffff', 0, 0.007, 0, 14);
   c.sleeveM = cyl(g, 0.046, 0.041, 0.05, '#b07a4a', 0, 0.045, 0, 14, { noShadow: true });
+  c.lidM.userData.home = c.lidM.position.clone(); c.sleeveM.userData.home = c.sleeveM.position.clone(); c.caps = [];
   tagAll(g, 'cup', { cup: c });
   scene.add(g); cups.push(c);
   refreshCup(c);
@@ -531,7 +534,7 @@ function refreshCup(c) {
   const h = lv * 0.12;
   c.liquid.scale.y = Math.max(0.001, h); c.liquid.position.y = 0.004 + h / 2;
   c.cubes.forEach((m, i) => m.visible = i < c.ice);
-  c.lidM.visible = c.lid; c.sleeveM.visible = c.sleeve;
+  c.lidM.visible = c.lid || c.caps.some(a => a.key === 'lid'); c.sleeveM.visible = c.sleeve || c.caps.some(a => a.key === 'sleeve');
 }
 function removeCup(c) {
   scene.remove(c.g); cups = cups.filter(x => x !== c);
@@ -752,7 +755,9 @@ function surfacePoint(lift = 0.04, minY = TOP + 0.01) {
   p.x = Math.max(-0.9, Math.min(2.8, p.x)); p.z = Math.max(-0.62, Math.min(0.3, p.z));
   return p;
 }
-function pfBasketTarget() { return blockOut(onPlane(GROUP.y) || new V3(), 0.06, 0.03); } // 머신 앞면 z = GROUP.z
+// 포터필터를 든 손 = 터치(커서) 지점. 바스켓은 손(핸들 끝)에서 PF_GRIP만큼 안쪽 → 손을 그룹헤드 아래로 밀면 결합
+const PF_GRIP = new V3(0.01, -0.01, 0.2);
+function pfBasketTarget() { return blockOut((onPlane(GROUP.y + PF_GRIP.y) || new V3()).sub(PF_GRIP), 0.06, 0.03); } // 머신 앞면 z = GROUP.z
 
 function downWithPF(hit, tag) {
   switch (tag) {
@@ -851,10 +856,37 @@ function capCup(tag) {
   const key = tag === 'lid' ? 'lid' : 'sleeve', name = tag === 'lid' ? '뚜껑' : '홀더';
   const list = targetCups();
   if (!list.length) return sign('컵이 없어요');
-  const c = list.find(x => !x[key]);
+  const c = list.find(x => !x[key] && !x.caps.some(a => a.key === key));
   if (!c) return sign('이미 ' + (key === 'lid' ? '뚜껑이' : '홀더가') + ' 있어요', true);
-  c[key] = true; refreshCup(c); SFX.click();
-  pop(name + ' OK', c.pos.clone().add(new V3(0, 0.2, 0)));
+  // 들고 있던 컵은 컵 자리(앞 링 우선)에 내려놓고 끼우는 모션을 보여 줌
+  if (c.where === 'right') {
+    const sl = !cupAt('c0') ? 'c0' : !cupAt('water') ? 'water' : null;
+    if (!sl) return sign('빈 컵 자리가 없어요');
+    c.where = sl; right = null;
+  }
+  c.caps.push({ key, name, t: 0, from: key === 'lid' ? LID_TOP.clone() : SLEEVE_TOP.clone() });
+  refreshCup(c); SFX.click();
+}
+// 뚜껑·홀더 끼우는 모션: 머신 위 더미에서 날아와 컵 위 → 꾹 눌러 끼움 (끝나야 결합 완료)
+const CAP_FLY = 0.3, CAP_PRESS = 0.15;
+function updateCaps(c, dt) {
+  for (const a of c.caps) {
+    a.t += dt;
+    const m = a.key === 'lid' ? c.lidM : c.sleeveM, home = m.userData.home;
+    const above = home.clone().add(new V3(0, a.key === 'lid' ? 0.07 : 0.16, 0)), fromL = a.from.clone().sub(c.pos);
+    if (a.t < CAP_FLY) {
+      const k = a.t / CAP_FLY;
+      m.position.lerpVectors(fromL, above, k); m.position.y += Math.sin(k * Math.PI) * 0.08; // 포물선
+    } else {
+      const k = Math.min(1, (a.t - CAP_FLY) / CAP_PRESS);
+      m.position.lerpVectors(above, home, k * k);
+    }
+    if (a.t >= CAP_FLY + CAP_PRESS) {
+      m.position.copy(home); c[a.key] = true; a.done = true;
+      SFX.lock(); pop(a.name + ' 딸깍!', c.pos.clone().add(new V3(0, 0.2, 0)));
+    }
+  }
+  if (c.caps.some(a => a.done)) { c.caps = c.caps.filter(a => !a.done); refreshCup(c); }
 }
 
 // ----- 뗌 -----
@@ -1130,7 +1162,7 @@ function update(dt, now) {
   } else if (brewPress > 0) { rTarget.copy(BREW_BTN).add(new V3(0, 0, 0.1)); }
   else if (right?.type === 'pf') {
     const b = pfBasketTarget();
-    rTarget.copy(b).add(new V3(0.01, -0.01, 0.2)); grip = true;
+    rTarget.copy(b).add(PF_GRIP); grip = true;
   } else if (right?.type === 'cup') {
     const p = blockOut(surfacePoint(0.05, TOP + 0.005), 0.05, 0.13);
     if (p) rTarget.copy(p).add(new V3(0.06, 0.07, 0.03)); grip = true;
@@ -1165,7 +1197,7 @@ function update(dt, now) {
     if (gesture.t >= 0.25) { pf.where = 'group'; pf.rot = 0; gesture = null; SFX.lock(); pop('철컥!', GROUP); }
   }
   if (pf.where === 'right' && right?.type === 'pf' && !gesture) {
-    const ks = KNOCK.clone().project(camera);
+    const ks = KNOCK.clone().add(PF_GRIP).project(camera); // 손이 드로어 위 핸들 자리에 오면 자석
     const kx = (ks.x + 1) / 2 * innerWidth, ky = (1 - ks.y) / 2 * innerHeight;
     pf.magnet = Math.hypot(mouse.x - kx, mouse.y - ky) < px(MAGNET_PX);
     if (pf.magnet) {
@@ -1178,7 +1210,7 @@ function update(dt, now) {
     if (gesture?.kind === 'knock' || pf.magnet) pfG.position.set(KNOCK.x, KNOCK.y - pf.knockY, KNOCK.z);
     else pfG.position.copy(pfBasketTarget()).add(new V3(shake, 0, 0));
     pfG.rotation.set(0, 0, gesture?.kind === 'knock' ? pf.flip || 0 : 0);
-    if (gesture?.kind === 'knock' || pf.magnet) rHand.position.copy(pfG.position).add(new V3(0.01, -0.01, 0.2));
+    if (gesture?.kind === 'knock' || pf.magnet) rHand.position.copy(pfG.position).add(PF_GRIP);
   } else {
     pfG.position.copy(pfPos()); pfG.rotation.set(0, pf.rot, 0);
   }
@@ -1227,6 +1259,7 @@ function update(dt, now) {
     if (c.where === 'right') { const p = blockOut(surfacePoint(0.05, TOP + 0.005), 0.05, 0.13); if (p) c.pos.copy(p); }
     else if (slotPos(c.where)) c.pos.lerp(slotPos(c.where), Math.min(1, dt * 14)); // 자리 이동은 스르륵
     else if (c.where === 'fly') flyCup(c, dt);
+    if (c.caps.length) updateCaps(c, dt);
     c.g.position.copy(c.pos);
   }
   cups.filter(c => c.gone).forEach(removeCup);
@@ -1301,9 +1334,11 @@ function hud() {
     const rows = laps.map((l, i) => `<div class="${i === laps.length - 1 ? 'last' : ''}">${i + 1}잔 · ${l.toFixed(1)}초</div>`).slice(-8);
     $('laps').innerHTML = rows.join('') + (phase === 'play' ? `<div>지금 ${(elapsed - lapStart).toFixed(1)}초</div>` : '');
   }
-  // 머신 위 남은 시간 표시: 결합한 원두가 타기까지 / 샷이 식기까지
-  const heatLeft = BURN_TIME - pf.heat, showHeat = phase === 'play' && pf.where === 'group' && (pf.burnt || (pf.state === 'tamped' && !brew));
-  tagAt('heatTag', showHeat, GROUP.clone().add(new V3(0, 0.08, 0.06)), pf.burnt ? '🔥 탄 원두' : '🔥 ' + Math.ceil(heatLeft) + '초', pf.burnt ? 'bad' : heatLeft <= 10 ? 'warn' : '');
+  // 머신 위 표시: 원두가 탔을 때만 (남은 시간은 안 보여 줌) / 샷이 식기까지
+  tagAt('heatTag', phase === 'play' && pf.where === 'group' && pf.burnt, GROUP.clone().add(new V3(0, 0.08, 0.06)), '🔥 탄 원두', 'bad');
+  // 정수기 위 물 남은 시간
+  const wc = waterFill?.cup;
+  tagAt('waterTag', phase === 'play' && !!wc, TAP.clone().add(new V3(0, 0.12, 0.03)), wc ? '💧 ' + Math.max(0, (WATER_TARGET - wc.water) / WATER_RATE).toFixed(1) + '초' : '', '');
   const coldLeft = COLD_TIME - glass.age, showGlass = phase === 'play' && glass.full && glass.where === 'tray' && !glass.pour && (glass.bad || coldLeft <= 20);
   tagAt('glassTag', showGlass, SPOT.group.clone().add(new V3(0, 0.1, 0.05)), glass.bad === 'burnt' ? '탄 샷 · 클릭해 버리기' : glass.bad ? '식은 샷 · 클릭해 버리기' : '❄ ' + Math.ceil(coldLeft) + '초',
     glass.bad ? 'bad' : 'warn');
