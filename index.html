@@ -295,8 +295,8 @@ function buildScene() {
     cyl(scene, 0.006, 0.006, 0.22, COL.steel, s * 0.38, TOP + 0.16, -0.22, 6, { rz: s * 0.15 });
   }
   // 추출 버튼 (그룹마다 위에 하나)
-  brewBtns = BTNS.map((b, i) => { const m = box(scene, 0.05, 0.035, 0.02, '#4cd964', b.x, TOP + 0.47, -0.205, { tag: 'brew' }); m.userData.gi = i; return m; });
-  BTNS.forEach((b, i) => hitBox(scene, 0.18, 0.11, 0.09, b.x, TOP + 0.488, -0.19, 'brew', { gi: i }));
+  brewBtns = BTNS.map((b, i) => { const m = box(scene, 0.07, 0.055, 0.02, '#4cd964', b.x, TOP + 0.46, -0.205, { tag: 'brew' }); m.userData.gi = i; return m; });
+  BTNS.forEach((b, i) => hitBox(scene, 0.2, 0.13, 0.1, b.x, TOP + 0.488, -0.19, 'brew', { gi: i }));
   // 머신 위: 뚜껑, 컵 홀더
   for (let i = 0; i < 6; i++) tagAll(makeDomeLid(scene, -0.2, TOP + 0.63 + i * 0.016, -0.42), 'lid'); // 돔 뚜껑 더미
   for (let i = 0; i < 8; i++) cyl(scene, 0.052, 0.045, 0.014, '#b07a4a', 0.08, TOP + 0.63 + i * 0.014, -0.42, 14, { tag: 'sleeve' });
